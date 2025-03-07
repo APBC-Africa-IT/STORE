@@ -114,5 +114,32 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+
+// @desc    Get user by ID
+// @route   GET /api/users/:id
+// @access  Private (only logged-in users)
+const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password"); // Exclude password
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const logoutUser = (req, res) => {
+  res.cookie("jwt", "", {
+    httpOnly: true,
+    expires: new Date(0), // Expire the cookie immediately
+  });
+
+  res.status(200).json({ message: "Logged out successfully" });
+};
+
 // Export functions at the end
-export { registerUser, getAllUsers, loginUser };
+export { registerUser, getAllUsers, loginUser, logoutUser, getUserById };

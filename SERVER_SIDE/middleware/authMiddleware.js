@@ -28,9 +28,11 @@ const protectRoute = (req, res, next) => {
 
 const protectAdmin = (req, res, next) => {
     if (!req.user || !req.user.isAdmin) {
+      console.log({ message: "Access denied, admin only" })
       return res.status(403).json({ message: "Access denied, admin only" });
-    }
+    } 
     next();
   };
+ 
 
   export { protectRoute, protectAdmin };

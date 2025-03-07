@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import connectDB from "./config/db.js"; // Update path to database config
 import userRoutes from "./routes/userRoutes.js"; // Update path to user routes
+import productRoutes from "./routes/productRoutes.js"; // Update path to product routes
+import cartRoutes from "./routes/cartRoutes.js"; // Update path to cart routes
 
 // Load environment variables
 dotenv.config();
@@ -25,6 +27,12 @@ app.get("/", (req, res) => {
 
 // User routes
 app.use("/api/users", userRoutes);
+
+//product routes 
+app.use("/api/products", productRoutes);
+
+//cart routes
+app.use("/api/cart", cartRoutes);
 
 // Start the server
 const PORT = process.env.PORT || 5000;
