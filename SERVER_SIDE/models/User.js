@@ -23,6 +23,13 @@ const userSchema = mongoose.Schema(
       type: Boolean,
       default: false, // Indicates admin or customer
     },
+    isVerified: {
+      type: Boolean,
+      default: false, // Indicates if user has verified email
+    },
+    verificationToken: {
+      type: String // Token to verify email
+    },   
   },
   {
     timestamps: true, // Adds createdAt and updatedAt fields

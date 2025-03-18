@@ -1,14 +1,18 @@
 import express from "express";
 const router = express.Router();
-import { registerUser, getAllUsers, loginUser, logoutUser, getUserById } from "../controllers/userController.js";
+import { registerUser, getAllUsers, loginUser, verifyUser, logoutUser, getUserById, makeAdmin } from "../controllers/userController.js";
 import { protectRoute, protectAdmin } from "../middleware/authMiddleware.js";
 // Route for user registration
 router.post("/register", registerUser);
 
-
-
 // Route for user login
 router.post("/login", loginUser);
+
+//Email verification
+router.get("/verify/:token", verifyUser);
+
+//make user an admin
+router.put("/makeAdmin/:id", protectRoute, protectAdmin,makeAdmin);
 
 // Route for user logout
 router.post("/logout", logoutUser);

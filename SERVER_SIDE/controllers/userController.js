@@ -1,7 +1,10 @@
 import User from "../models/User.js";
+import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import sendVerificationEmail from "../utils/sendEmail.js";
+//const crypto = require("crypto"); // Used to generate a random token
 
 dotenv.config();
 
@@ -12,9 +15,9 @@ dotenv.config();
  */
 const registerUser = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, isAdmin } = req.body;
+    const { firstName, lastName, email, password } = req.body;
 
-    // Check if user already exists
+    // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
@@ -24,28 +27,66 @@ const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create a new user
+    // Generate verification token
+    const verificationToken = jwt.sign({ email }, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
+    // Generate a random token for email verification
+    //const verificationToken = crypto.randomBytes(32).toString("hex");
+
+    // Hash the verification token before saving
+    //const hashedToken = await bcrypt.hash(verificationToken, 10);
+
+    // Create user (unverified)
     const user = new User({
       firstName,
       lastName,
       email,
       password: hashedPassword,
-      isAdmin: isAdmin || false,
+      isVerified: false,
+      verificationToken,
     });
 
     await user.save();
 
-    res.status(201).json({
-      _id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      isAdmin: user.isAdmin,
-    });
+    // Send verification email
+    await sendVerificationEmail(user, verificationToken);
+
+    res.status(201).json({ message: "User registered. Check email for verification link." });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
+/**
+ * @desc    Verify user's email
+ * @route   GET /api/users/verify/:token
+ * @access  Public
+ */
+const verifyUser = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findOne({ email: decoded.email });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+
+    // Mark user as verified
+    user.isVerified = true;
+    user.verificationToken = null; // Remove token after verification
+    await user.save();
+
+    res.status(200).json({ message: "Email verified successfully. You can now log in." });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 /**
  * @desc    Login user & get token
@@ -61,6 +102,11 @@ const loginUser = async (req, res) => {
 
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Check if user is verified
+    if (!user.isVerified) {
+      return res.status(403).json({ message: "Please verify your email before logging in." });
     }
 
     // Check if password matches
@@ -85,15 +131,55 @@ const loginUser = async (req, res) => {
     });
 
     res.status(200).json({
+      message: "Login successful, token stored in cookie",
+
       _id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
       isAdmin: user.isAdmin,
       token,
-      message: "Login successful, token stored in cookie",
     });
-    
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * @desc    make user an Admin(Admin only)
+ * @route   PUT /api/users/:id
+ * @access  Admin
+ */
+
+
+
+const makeAdmin = async (req, res) => {
+  try {
+    // Check if the logged-in user is an admin
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ message: "Access denied. Admins only." });
+    }
+
+    const { id } = req.params;
+    // console.log("userId:", id); // Log the incoming ID
+    // console.log("Is valid ObjectId:", mongoose.Types.ObjectId.isValid(id)); // Check validity
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
+    }
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.isAdmin = true;
+    await user.save();
+
+    res.status(200).json({ message: "User promoted to admin", user });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -142,4 +228,4 @@ const logoutUser = (req, res) => {
 };
 
 // Export functions at the end
-export { registerUser, getAllUsers, loginUser, logoutUser, getUserById };
+export { registerUser, getAllUsers, loginUser, logoutUser, getUserById, makeAdmin, verifyUser };
