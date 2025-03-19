@@ -30,6 +30,9 @@ const userSchema = mongoose.Schema(
     verificationToken: {
       type: String // Token to verify email
     },   
+    verificationTokenExpires: {
+      type: Date, // Stores the expiration time of the token
+    } 
   },
   {
     timestamps: true, // Adds createdAt and updatedAt fields

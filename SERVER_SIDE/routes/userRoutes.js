@@ -1,6 +1,6 @@
 import express from "express";
 const router = express.Router();
-import { registerUser, getAllUsers, loginUser, verifyUser, logoutUser, getUserById, makeAdmin } from "../controllers/userController.js";
+import { registerUser, getAllUsers, loginUser, verifyUser, logoutUser, getUserById, makeAdmin, resendVerificationEmail } from "../controllers/userController.js";
 import { protectRoute, protectAdmin } from "../middleware/authMiddleware.js";
 // Route for user registration
 router.post("/register", registerUser);
@@ -10,6 +10,9 @@ router.post("/login", loginUser);
 
 //Email verification
 router.get("/verify/:token", verifyUser);
+
+//Resend verification Email
+router.post("/resend-verification",resendVerificationEmail )
 
 //make user an admin
 router.put("/makeAdmin/:id", protectRoute, protectAdmin,makeAdmin);
