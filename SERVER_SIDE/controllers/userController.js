@@ -3,8 +3,8 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
-import sendVerificationEmail from "../utils/sendEmail.js";
 import crypto from "crypto"// Used to generate a random token
+import {sendVerificationEmail} from "../utils/sendEmail.js";
 
 dotenv.config();
 
@@ -64,124 +64,8 @@ const registerUser = async (req, res) => {
   }
 };
 
-/**
- * @desc    Verify user's email
- * @route   GET /api/users/verify/:token
- * @access  Public
- */
-// const verifyUser = async (req, res) => {
-//   try {
-//     const { token } = req.params;
-
-//     // Verify token
-//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-//     const user = await User.findOne({ email: decoded.email });
-
-//     if (!user) {
-//       return res.status(400).json({ message: "Invalid or expired token" });
-//     }
-
-//     // Mark user as verified
-//     user.isVerified = true;
-//     user.verificationToken = null; // Remove token after verification
-//     await user.save();
-
-//     res.status(200).json({ message: "Email verified successfully. You can now log in." });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-const verifyUser = async (req, res) => {
-  try {
-    const { token } = req.params;
-
-    // Find user by matching the verification token
-    const users = await User.find({ isVerified: false }); // Get all unverified users
-    const user = users.find(u => bcrypt.compareSync(token, u.verificationToken)); // Find the correct user
-
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token" });
-    }
-
-    // Check if token has expired
-    if (user.verificationTokenExpires < new Date()) {
-      // Token expired → Generate a new one
-      const newToken = crypto.randomBytes(32).toString("hex");
-      const hashedNewToken = await bcrypt.hash(newToken, 10);
-
-      // Update user with new token and expiration time
-      user.verificationToken = hashedNewToken;
-      user.verificationTokenExpires = new Date(Date.now() + 1 * 60  * 1000); // 24 hours expiry
-
-      await user.save();
-
-      // Resend the email with the new token
-      await sendVerificationEmail(user, newToken);
-
-      return res.status(400).json({
-        message: "Verification token expired. A new verification email has been sent. Please check your inbox."
-      });
-    }
-
-    // Token is valid → Verify user
-    user.isVerified = true;
-    user.verificationToken = null;
-    user.verificationTokenExpires = null;
-    await user.save();
-
-    res.status(200).json({ message: "Email verified successfully. Please proceed to Login!" });
-
-  } catch (error) {
-    console.error("Error verifying user:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
 
 
-
-
-/**
- * resend verification email
- * POST /api/users/resend-verification
- * public
- */
-
-const resendVerificationEmail = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    // Find the user
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // If the user is already verified, return an error
-    if (user.isVerified) {
-      return res.status(400).json({ message: "User is already verified. You can log in." });
-    }
-
-    // Generate a new token
-    const newToken = crypto.randomBytes(32).toString("hex");
-    const hashedNewToken = await bcrypt.hash(newToken, 10); // Hash before storing
-
-    // Update the user record
-    user.verificationToken = hashedNewToken;
-    user.verificationTokenExpires = new Date(Date.now() + 1 * 60 * 1000); // 24 hours
-
-    await user.save();
-
-    // Send the new verification email
-    const verificationLink = `http://localhost:5000/api/users/verify/${newToken}`;
-    await sendVerificationEmail(user, verificationLink);
-
-    res.status(200).json({ message: "A new verification email has been sent. Please check your inbox." });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 
 
 
@@ -199,6 +83,13 @@ const loginUser = async (req, res) => {
 
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Check if the account is deactivated
+    if (user.isDeleted) {
+      return res.status(403).json({
+        message: "Your account has been deactivated. Contact support if you wish to reactivate.",
+      });
     }
 
     // Check if user is verified
@@ -229,7 +120,6 @@ const loginUser = async (req, res) => {
 
     res.status(200).json({
       message: "Login successful, token stored in cookie",
-
       _id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
@@ -242,6 +132,7 @@ const loginUser = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 /**
  * @desc    make user an Admin(Admin only)
@@ -324,5 +215,6 @@ const logoutUser = (req, res) => {
   res.status(200).json({ message: "Logged out successfully" });
 };
 
+
 // Export functions at the end
-export { registerUser, getAllUsers, loginUser, logoutUser, getUserById, makeAdmin, verifyUser, resendVerificationEmail };
+export { registerUser, getAllUsers, loginUser, logoutUser, getUserById, makeAdmin };

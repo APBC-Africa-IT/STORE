@@ -1,6 +1,6 @@
 import express from "express";
 const router = express.Router();
-import { registerUser, getAllUsers, loginUser, verifyUser, logoutUser, getUserById, makeAdmin, resendVerificationEmail } from "../controllers/userController.js";
+import { registerUser, getAllUsers, loginUser, logoutUser, getUserById, makeAdmin, } from "../controllers/userController.js";
 import { protectRoute, protectAdmin } from "../middleware/authMiddleware.js";
 // Route for user registration
 router.post("/register", registerUser);
@@ -8,11 +8,7 @@ router.post("/register", registerUser);
 // Route for user login
 router.post("/login", loginUser);
 
-//Email verification
-router.get("/verify/:token", verifyUser);
 
-//Resend verification Email
-router.post("/resend-verification",resendVerificationEmail )
 
 //make user an admin
 router.put("/makeAdmin/:id", protectRoute, protectAdmin,makeAdmin);
@@ -28,5 +24,7 @@ router.get("/", protectRoute, protectAdmin, getAllUsers);
 // Route to get user by ID
 // Only logged-in users can access it
 router.get("/:id", protectRoute, protectAdmin, getUserById);
+
+
 
 export default router;

@@ -5,6 +5,9 @@ import connectDB from "./config/db.js"; // Update path to database config
 import userRoutes from "./routes/userRoutes.js"; // Update path to user routes
 import productRoutes from "./routes/productRoutes.js"; // Update path to product routes
 import cartRoutes from "./routes/cartRoutes.js"; // Update path to cart routes
+import passwordResetRoutes from "./routes/passwordResetRoutes.js"; // Update path to reset password routes
+import emailverification from "./routes/emailVerificationRoutes.js"
+import Account  from "./routes/accountRoutes.js"
 
 // Load environment variables
 dotenv.config();
@@ -33,6 +36,15 @@ app.use("/api/products", productRoutes);
 
 //cart routes
 app.use("/api/cart", cartRoutes);
+
+//password reset routes
+app.use("/api/reset", passwordResetRoutes);
+
+//emailVerificationAPI
+app.use("/api/email", emailverification);
+
+// accountdeactivation
+app.use("/api/softDelete", Account);
 
 // Start the server
 const PORT = process.env.PORT || 5000;
