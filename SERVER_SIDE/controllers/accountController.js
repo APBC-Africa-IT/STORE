@@ -6,7 +6,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-
 // Soft Delete Implementation (Marking as Deactivated)
 // Instead of deleting the user record, we'll:
 
@@ -19,8 +18,6 @@ dotenv.config();
  * route DELETE /api/softDelete/deactivate/:id
  * access public
  */
-
-
 
 const deactivateAccount = async (req, res) => {
   try {
@@ -64,6 +61,7 @@ const reactivateUserAccount = async (req, res) => {
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({ message: "Invalid user ID format." });
+            
         }
 
         const user = await User.findById(id);
