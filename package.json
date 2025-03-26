@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon SERVER_SIDE/index.js",
-    "dev": "nodemon index.js"
+    "server": "nodemon SERVER_SIDE/index.js",
+    "client": "cd FRONTEND && npm run dev",
+    "start": "concurrently \"npm run server\" \"npm run client\""
   },
   "keywords": [],
   "author": "",
@@ -21,5 +22,8 @@
     "mongoose": "^8.12.2",
     "nodemailer": "^6.10.0",
     "nodemon": "^3.1.9"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }
