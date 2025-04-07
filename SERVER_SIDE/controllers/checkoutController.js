@@ -1,43 +1,90 @@
 import Cart from "../models/cartModel.js";
 import Order from "../models/orderModel.js";
+import Discount from "../models/discountModel.js";
 
-// Checkout Controller
-const checkoutOrder = async (req, res) => {
-  try {
-    const { userId, paymentDetails, deliveryAddress } = req.body;
 
-    // 1. Retrieve the user's cart
-    const cart = await Cart.findOne({ user: userId });
-    if (!cart || cart.cartItems.length === 0) {
-      return res.status(400).json({ message: "Your cart is empty. Add some items to proceed." });
+
+// Checkout controller for handling order placement
+ const checkoutOrder = async (req, res) => {
+    try {
+      const { discountCode, cartId, shippingAddress } = req.body;
+      
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+  
+      // Retrieve the cart items for the user
+      const cart = await Cart.findById(cartId);
+      if (!cart || cart.user.toString() !== user._id.toString()) {
+        return res.status(400).json({ message: "Invalid cart" });
+      }
+  
+      // Calculate the total order value from the cart
+      let orderTotal = cart.cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+  
+      // Check if a discount code is applied
+      if (discountCode) {
+        // Find the discount
+        const discount = await Discount.findOne({ code: discountCode });
+        if (discount && discount.expiryDate > Date.now() && discount.active) {
+          const discountAmount = (orderTotal * discount.percentage) / 100;
+          orderTotal -= discountAmount;
+        } else {
+          return res.status(400).json({ message: "Invalid or expired discount code" });
+        }
+      }
+  
+      // Create a new order
+      const newOrder = new Order({
+        user: user._id,
+        orderItems: cart.cartItems,
+        shippingAddress,
+        totalAmount: orderTotal,
+        status: "Pending",
+      });
+  
+      await newOrder.save();
+  
+      // Optionally, clear the cart after placing the order
+      cart.cartItems = [];
+      await cart.save();
+  
+      // Respond with order details
+      res.status(200).json({ message: "Order placed successfully", order: newOrder });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
     }
+  };
 
-    // 2. Calculate the total amount for the order
-    const totalAmount = cart.cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+  // Create a new discount code
+const createDiscountCode = async (req, res) => {
+    try {
+      const { code, percentage, expiryDate } = req.body;
+  
+      // Basic validation
+      if (!code || !percentage || !expiryDate) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+  
+      // Check if discount code already exists
+      const existingDiscount = await Discount.findOne({ code });
+      if (existingDiscount) {
+        return res.status(409).json({ message: "Discount code already exists" });
+      }
+  
+      const discount = new Discount({
+        code,
+        percentage,
+        expiryDate,
+      });
+  
+      await discount.save();
+  
+      res.status(201).json({ message: "Discount code created successfully", discount });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  };
 
-    // 3. Create a new order based on the cart items
-    const newOrder = new Order({
-      user: userId,
-      orderItems: cart.cartItems,
-      totalAmount,
-      paymentDetails, // This could contain payment method and status
-      deliveryAddress,
-      status: "pending", // Initial status when the order is placed
-    });
-
-    // 4. Save the order to the database
-    await newOrder.save();
-
-    // 5. Optionally, clear the user's cart (empty it after checkout)
-    await Cart.deleteOne({ user: userId });
-
-    // 6. Respond to the client with the order details
-    res.status(200).json({ message: "Order placed successfully", order: newOrder });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Failed to process checkout." });
-  }
-};
-
-export { checkoutOrder };
+export { checkoutOrder, createDiscountCode };
