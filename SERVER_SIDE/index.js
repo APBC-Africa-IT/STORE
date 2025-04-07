@@ -8,6 +8,7 @@ import cartRoutes from "./routes/cartRoutes.js"; // Update path to cart routes
 import passwordResetRoutes from "./routes/passwordResetRoutes.js"; // Update path to reset password routes
 import emailverification from "./routes/emailVerificationRoutes.js"
 import Account  from "./routes/accountRoutes.js"
+import checkout from "./routes/checkoutRoute.js"
 
 // Load environment variables
 dotenv.config();
@@ -45,6 +46,9 @@ app.use("/api/email", emailverification);
 
 // accountdeactivation
 app.use("/api/softDelete", Account);
+
+//checkout route
+app.use("/api/checkout", checkout)
 
 // Start the server
 const PORT = process.env.PORT || 5000;
