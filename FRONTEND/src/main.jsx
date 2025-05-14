@@ -7,10 +7,12 @@ import App from './App.jsx';
 import {Provider} from 'react-redux';
 import store from './store';
 import {createBrowserRouter, createRoutesFromElements, Route, RouterProvider} from 'react-router-dom'
+import LandingPage from './pages/LandingPage.jsx';
+
 const routes = createBrowserRouter(
   createRoutesFromElements(
-    <Route path="/" element={<App />}>
-      {/* other routes */}
+    <Route path="/" element={<LandingPage />}>
+    < Route path="landing" element={<LandingPage />} />
       </Route>
 
   ))
@@ -21,5 +23,4 @@ const root = ReactDOM.createRoot(document.getElementById('root')).render(
     <RouterProvider router={routes}/>
     </Provider>
   </React.StrictMode>
-  
 )
