@@ -7,12 +7,12 @@ import App from './App.jsx';
 import {Provider} from 'react-redux';
 import store from './store';
 import {createBrowserRouter, createRoutesFromElements, Route, RouterProvider} from 'react-router-dom'
-import LandingPage from './pages/LandingPage.jsx';
+import LandingDisplay from './pages/Landingpage/LandingDisplay.jsx'
 
 const routes = createBrowserRouter(
   createRoutesFromElements(
-    <Route path="/" element={<LandingPage />}>
-    < Route path="landing" element={<LandingPage />} />
+    <Route path="/" element={<LandingDisplay />}>
+    < Route path="landing" element={<LandingDisplay />} />
       </Route>
 
   ))
