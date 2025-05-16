@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MagnifyingGlassIcon, ShieldCheckIcon, TruckIcon, WrenchScrewdriverIcon, StarIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ShieldCheckIcon, TruckIcon, WrenchScrewdriverIcon, StarIcon, UserIcon } from '@heroicons/react/24/outline';
 
 export default function Home() {
   const categories = [
@@ -64,7 +64,7 @@ export default function Home() {
       name: 'LED Headlight Set',
       price: 199.99,
       rating: 5,
-      image: 'https://images.pexels.com/photos/9628108/pexels-photo-9628108.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
+      image: 'https://images.pexels.com/photos/2244746/pexels-photo-2244746.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
     },
     {
       id: 4,
@@ -77,6 +77,48 @@ export default function Home() {
 
   return (
     <div className="bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
+      
+      {/* Enhanced Header */}
+      <header className="relative z-50 bg-gray-900/80 backdrop-blur-sm border-b border-gray-800">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center">
+              <Link to="/" className="flex items-center space-x-2">
+                <img
+                  src="https://images.pexels.com/photos/162553/keys-workshop-mechanic-tools-162553.jpeg?auto=compress&cs=tinysrgb&w=50"
+                  alt="AutoParts Logo"
+                  className="h-10 w-10 rounded-full object-cover"
+                />
+                <span className="text-xl font-bold text-white">AutoParts</span>
+              </Link>
+            </div>
+            
+            <nav className="hidden md:flex items-center space-x-8">
+              <Link to="/shop" className="text-gray-300 hover:text-white transition-colors">Shop</Link>
+              <Link to="/categories" className="text-gray-300 hover:text-white transition-colors">Categories</Link>
+              <Link to="/brands" className="text-gray-300 hover:text-white transition-colors">Brands</Link>
+              <Link to="/about" className="text-gray-300 hover:text-white transition-colors">About</Link>
+            </nav>
+
+            <div className="flex items-center space-x-4">
+              <Link
+                to="/signin"
+                className="text-gray-300 hover:text-white transition-colors flex items-center space-x-1"
+              >
+                <UserIcon className="h-5 w-5" />
+                <span>Sign In</span>
+              </Link>
+              <Link
+                to="/signup"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-500 transition-colors"
+              >
+                Sign Up
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* Hero section */}
       <div className="relative isolate overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/30 via-purple-500/30 to-pink-500/30 mix-blend-overlay"></div>
@@ -238,7 +280,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-12 pt-8 text-center">
-            <p className="text-gray-400">&copy; 2024 MysparesGuy. All rights reserved.</p>
+            <p className="text-gray-400">&copy; 2024 ModernShop. All rights reserved.</p>
           </div>
         </div>
       </footer>
