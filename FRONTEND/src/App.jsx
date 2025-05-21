@@ -8,6 +8,7 @@ import CategoryPage from './pages/CategoryPage';
 import CartPage from './pages/CartPage';
 import SearchPage from './pages/SearchPage';
 import NotFoundPage from './pages/NotFoundPage';
+import AuthPage from './pages/AuthPage';
 import { CartProvider } from './context/CartContext';
 import { SearchProvider } from './context/SearchContext';
 
@@ -25,6 +26,7 @@ function App() {
               <Route path="/cart" element={<CartPage />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="*" element={<NotFoundPage />} />
+              <Route path="/auth" element={<AuthPage />} />
             </Routes>
           </main>
           <Footer />

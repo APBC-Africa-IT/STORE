@@ -52,7 +52,7 @@ function Header() {
             </div>
           </div>
           <div className="flex items-center space-x-6 text-sm">
-            <Link to="/account" className="hover:text-primary-200 transition-colors">My Account</Link>
+            <Link to="/auth" className="hover:text-primary-200 transition-colors">My Account</Link>
             <Link to="/support" className="hover:text-primary-200 transition-colors">Support</Link>
             <Link to="/track-order" className="hover:text-primary-200 transition-colors">Track Order</Link>
           </div>
@@ -106,7 +106,7 @@ function Header() {
               <Heart size={20} />
               <span className="ml-1 hidden lg:inline">Wishlist</span>
             </Link>
-            <Link to="/account" className="hidden md:flex items-center text-neutral-600 hover:text-primary-600 transition-colors">
+            <Link to="/auth" className="hidden md:flex items-center text-neutral-600 hover:text-primary-600 transition-colors">
               <User size={20} />
               <span className="ml-1 hidden lg:inline">Account</span>
             </Link>
