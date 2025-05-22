@@ -75,7 +75,7 @@ function Header() {
           <Link to="/" className="flex items-center">
             <div className="flex items-center text-primary-900 font-bold text-xl md:text-2xl">
               <Tool className="mr-2" />
-              <span>AutoSpares</span>
+              <span>MySparesGuy</span>
             </div>
           </Link>
 

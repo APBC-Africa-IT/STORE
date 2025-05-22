@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
-import {useRegisterMutation, useLoginMutation} from '../slices/UserApiSlice';
-import { useDispatch, useSelector } from 'react-redux';
-//import { useState, useEffect } from 'react';
 
 function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -37,6 +34,11 @@ function AuthPage() {
     console.log('Reset password for:', formData.email);
   };
 
+  const handleGoogleSignIn = () => {
+    // Google sign-in logic would go here
+    console.log('Google sign-in clicked');
+  };
+
   return (
     <div className="min-h-screen bg-neutral-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto">
@@ -59,6 +61,32 @@ function AuthPage() {
             </p>
           </div>
 
+          {/* Google Sign In Button */}
+          {!showForgotPassword && (
+            <div className="mb-6">
+              <button
+                onClick={handleGoogleSignIn}
+                className="w-full flex items-center justify-center px-4 py-2 border border-neutral-300 rounded-md shadow-sm bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+              >
+                <img 
+                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
+                  alt="Google logo" 
+                  className="w-5 h-5 mr-2"
+                />
+                Continue with Google
+              </button>
+              
+              <div className="relative mt-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-neutral-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-neutral-500">Or continue with email</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={showForgotPassword ? handleForgotPassword : handleSubmit}>
             {/* Name Field (Sign Up only) */}
@@ -78,7 +106,7 @@ function AuthPage() {
                     value={formData.name}
                     onChange={handleChange}
                     className="block w-full pl-10 pr-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="Full Name"
+                    placeholder="John Doe"
                     required
                   />
                 </div>
@@ -101,7 +129,7 @@ function AuthPage() {
                   value={formData.email}
                   onChange={handleChange}
                   className="block w-full pl-10 pr-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="you@gmail.com"
+                  placeholder="you@example.com"
                   required
                 />
               </div>
