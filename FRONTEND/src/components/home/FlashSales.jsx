@@ -75,7 +75,7 @@ function FlashSales() {
 
         {/* Products Grid */}
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold text-neutral-900">Hot Deals</h3>
+          <h3 className="text-xl font-semibold text-neutral-900">Hot Deals This Holiday</h3>
           <Link 
             to="/sales" 
             className="text-primary-600 hover:text-primary-800 font-medium flex items-center transition-colors"
