@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, Menu, X, User, Heart, Truck, PenTool as Tool, ChevronDown } from 'lucide-react';
+import { useSelector, useDispatch } from 'react-redux';
+import { Search, ShoppingCart, Menu, X, User, Heart, Truck, PenTool as Tool, ChevronDown, LogOut } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useSearch } from '../../context/SearchContext';
+import { useLogoutMutation } from '../../slices/UserApiSlice';
+//import { logout } from '../../slices/UserApiSlice';
 import { categories } from '../../data/categories';
 import MobileMenu from './MobileMenu';
 
@@ -11,9 +14,15 @@ function Header() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [openCategory, setOpenCategory] = useState(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  
   const { cart } = useCart();
   const { handleSearch } = useSearch();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const { userInfo } = useSelector((state) => state.auth);
+  const [logoutApiCall] = useLogoutMutation();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -40,6 +49,16 @@ function Header() {
     setOpenCategory(openCategory === categoryId ? null : categoryId);
   };
 
+  const handleLogout = async () => {
+    try {
+      await logoutApiCall().unwrap();
+      dispatch(logout());
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${isScrolled ? 'bg-white shadow-md' : 'bg-white'}`}>
       {/* Top Bar */}
@@ -52,7 +71,13 @@ function Header() {
             </div>
           </div>
           <div className="flex items-center space-x-6 text-sm">
-            <Link to="/auth" className="hover:text-primary-200 transition-colors">My Account</Link>
+            {userInfo ? (
+              <span className="hover:text-primary-200 transition-colors">
+                Welcome, {userInfo.firstName}!
+              </span>
+            ) : (
+              <Link to="/auth" className="hover:text-primary-200 transition-colors">My Account</Link>
+            )}
             <Link to="/support" className="hover:text-primary-200 transition-colors">Support</Link>
             <Link to="/track-order" className="hover:text-primary-200 transition-colors">Track Order</Link>
           </div>
@@ -75,7 +100,7 @@ function Header() {
           <Link to="/" className="flex items-center">
             <div className="flex items-center text-primary-900 font-bold text-xl md:text-2xl">
               <Tool className="mr-2" />
-              <span>MySparesGuy</span>
+              <span>AutoSpares</span>
             </div>
           </Link>
 
@@ -106,10 +131,54 @@ function Header() {
               <Heart size={20} />
               <span className="ml-1 hidden lg:inline">Wishlist</span>
             </Link>
-            <Link to="/auth" className="hidden md:flex items-center text-neutral-600 hover:text-primary-600 transition-colors">
-              <User size={20} />
-              <span className="ml-1 hidden lg:inline">Account</span>
-            </Link>
+            
+            {/* User Account Dropdown */}
+            <div className="relative">
+              {userInfo ? (
+                <div>
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="hidden md:flex items-center text-neutral-600 hover:text-primary-600 transition-colors"
+                  >
+                    <User size={20} />
+                    <span className="ml-1 hidden lg:inline">{userInfo.firstName}</span>
+                    <ChevronDown size={16} className="ml-1" />
+                  </button>
+                  
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                      <Link
+                        to="/profile"
+                        className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        My Profile
+                      </Link>
+                      <Link
+                        to="/orders"
+                        className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        My Orders
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
+                      >
+                        <LogOut size={16} className="inline mr-2" />
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link to="/auth" className="hidden md:flex items-center text-neutral-600 hover:text-primary-600 transition-colors">
+                  <User size={20} />
+                  <span className="ml-1 hidden lg:inline">Account</span>
+                </Link>
+              )}
+            </div>
+
             <Link to="/cart" className="flex items-center text-neutral-600 hover:text-primary-600 transition-colors relative">
               <ShoppingCart size={20} />
               <span className="ml-1 hidden lg:inline">Cart</span>

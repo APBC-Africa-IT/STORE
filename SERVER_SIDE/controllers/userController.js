@@ -40,7 +40,7 @@ const registerUser = async (req, res) => {
 
     // Set expiration time to 24 hours from now
     const expirationTime = new Date();
-    expirationTime.setMinutes(expirationTime.getMinutes() + 1);
+    expirationTime.setMinutes(expirationTime.getMinutes() + 5);
 
     // Create user (unverified)
     const user = new User({

@@ -1,18 +1,40 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { Mail, Lock, User, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { useLoginMutation, useRegisterMutation } from '../slices/UserApiSlice'
+import { setCredentials } from '../slices/AuthSlice';
 
 function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    name: '',
+    firstName: '',
+    lastName: '',
     confirmPassword: ''
   });
+
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [login, { isLoading: loginLoading }] = useLoginMutation();
+  const [register, { isLoading: registerLoading }] = useRegisterMutation();
+
+  const { userInfo } = useSelector((state) => state.auth);
+
+  const redirect = location.search ? location.search.split('=')[1] : '/';
+
+  useEffect(() => {
+    if (userInfo) {
+      navigate(redirect);
+    }
+  }, [navigate, redirect, userInfo]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -22,16 +44,55 @@ function AuthPage() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle authentication logic here
-    console.log('Form submitted:', formData);
-  };
+    
+    if (showForgotPassword) {
+      // Handle password reset logic here
+      console.log('Reset password for:', formData.email);
+      return;
+    }
 
-  const handleForgotPassword = (e) => {
-    e.preventDefault();
-    // Handle password reset logic here
-    console.log('Reset password for:', formData.email);
+    try {
+      if (isLogin) {
+        // Login
+        const res = await login({
+          email: formData.email,
+          password: formData.password
+        }).unwrap();
+        
+        dispatch(setCredentials({ ...res }));
+        navigate(redirect);
+      } else {
+        // Register
+        if (formData.password !== formData.confirmPassword) {
+          alert('Passwords do not match');
+          return;
+        }
+
+        const res = await register({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password
+        }).unwrap();
+
+        // Show success message for registration
+        alert(res.message || 'Registration successful! Please check your email for verification.');
+        
+        // Switch to login form after successful registration
+        setIsLogin(true);
+        setFormData({
+          email: formData.email,
+          password: '',
+          firstName: '',
+          lastName: '',
+          confirmPassword: ''
+        });
+      }
+    } catch (err) {
+      alert(err?.data?.message || err.error || 'An error occurred');
+    }
   };
 
   const handleGoogleSignIn = () => {
@@ -88,25 +149,42 @@ function AuthPage() {
           )}
 
           {/* Form */}
-          <form onSubmit={showForgotPassword ? handleForgotPassword : handleSubmit}>
-            {/* Name Field (Sign Up only) */}
+          <form onSubmit={handleSubmit}>
+            {/* Name Fields (Sign Up only) */}
             {!isLogin && !showForgotPassword && (
-              <div className="mb-4">
-                <label htmlFor="name" className="block text-sm font-medium text-neutral-700 mb-1">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User size={20} className="text-neutral-400" />
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-neutral-700 mb-1">
+                    First Name
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User size={20} className="text-neutral-400" />
+                    </div>
+                    <input
+                      type="text"
+                      id="firstName"
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      className="block w-full pl-10 pr-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="John"
+                      required
+                    />
                   </div>
+                </div>
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-neutral-700 mb-1">
+                    Last Name
+                  </label>
                   <input
                     type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
+                    id="lastName"
+                    name="lastName"
+                    value={formData.lastName}
                     onChange={handleChange}
-                    className="block w-full pl-10 pr-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="John Doe"
+                    className="block w-full pr-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Doe"
                     required
                   />
                 </div>
@@ -181,15 +259,26 @@ function AuthPage() {
                     <Lock size={20} className="text-neutral-400" />
                   </div>
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={showConfirmPassword ? "text" : "password"}
                     id="confirmPassword"
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className="block w-full pl-10 pr-3 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                    className="block w-full pl-10 pr-10 py-2 border border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
                     placeholder="••••••••"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff size={20} className="text-neutral-400 hover:text-neutral-600" />
+                    ) : (
+                      <Eye size={20} className="text-neutral-400 hover:text-neutral-600" />
+                    )}
+                  </button>
                 </div>
               </div>
             )}
@@ -221,8 +310,12 @@ function AuthPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              disabled={loginLoading || registerLoading}
+              className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              {(loginLoading || registerLoading) ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              ) : null}
               {showForgotPassword ? (
                 <>
                   Reset Password
