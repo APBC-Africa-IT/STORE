@@ -66,7 +66,7 @@ const verifyUser = async (req, res) => {
   
         // Update only the resent token fields
         user.resentVerificationToken = hashedNewToken;
-        user.resentVerificationTokenExpires = new Date(Date.now() + 1 * 60 * 1000); // 1 min expiry
+        user.resentVerificationTokenExpires = new Date(Date.now() + 5 * 60 * 1000); // 1 min expiry
   
         await user.save();
   

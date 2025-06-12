@@ -9,30 +9,39 @@ import CartPage from './pages/CartPage';
 import SearchPage from './pages/SearchPage';
 import NotFoundPage from './pages/NotFoundPage';
 import AuthPage from './pages/AuthPage';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import { CartProvider } from './context/CartContext';
 import { SearchProvider } from './context/SearchContext';
 
 function App() {
   return (
     <SearchProvider>
-      <CartProvider>
-        <div className="flex flex-col min-h-screen">
-          <Header />
-          <main className="flex-grow">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/product/:id" element={<ProductPage />} />
-              <Route path="/category/:slug" element={<CategoryPage />} />
-              <Route path="/cart" element={<CartPage />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="*" element={<NotFoundPage />} />
-              <Route path="/auth" element={<AuthPage />} />
-            </Routes>
-          </main>
-          <Footer />
-        </div>
-      </CartProvider>
-    </SearchProvider>
+        <CartProvider>
+          <Routes>
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={<AdminDashboard />} />
+            
+            {/* Public Routes */}
+            <Route path="/*" element={
+              <div className="flex flex-col min-h-screen">
+                <Header />
+                <main className="flex-grow">
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/product/:id" element={<ProductPage />} />
+                    <Route path="/category/:slug" element={<CategoryPage />} />
+                    <Route path="/cart" element={<CartPage />} />
+                    <Route path="/search" element={<SearchPage />} />
+                    <Route path="/auth" element={<AuthPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Routes>
+                </main>
+                <Footer />
+              </div>
+            } />
+          </Routes>
+        </CartProvider>
+      </SearchProvider>
   );
 }
 
