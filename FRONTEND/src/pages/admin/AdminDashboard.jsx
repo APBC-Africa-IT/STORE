@@ -22,26 +22,25 @@ function AdminDashboard() {
 //   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      
-      <div className="lg:pl-64">
-        <AdminHeader onMenuClick={() => setSidebarOpen(true)} />
-        
-        <main className="p-4 lg:p-6">
-          <Routes>
-            <Route path="/" element={<DashboardOverview />} />
-            <Route path="/products" element={<ProductsManagement />} />
-            <Route path="/orders" element={<OrdersManagement />} />
-            <Route path="/users" element={<UsersManagement />} />
-            <Route path="/categories" element={<CategoriesManagement />} />
-            <Route path="/inventory" element={<InventoryManagement />} />
-            <Route path="/analytics" element={<AnalyticsReports />} />
-            <Route path="/settings" element={<AdminSettings />} />
-          </Routes>
-        </main>
-      </div>
-    </div>
+    <div className="flex min-h-screen bg-neutral-50">
+  <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+  <div className="flex-1 lg:pl-64">
+    <AdminHeader onMenuClick={() => setSidebarOpen(true)} />
+    <main className="p-4 lg:p-6">
+      <Routes>
+        <Route path="/" element={<DashboardOverview />} />
+        <Route path="/products" element={<ProductsManagement />} />
+        <Route path="/orders" element={<OrdersManagement />} />
+        <Route path="/users" element={<UsersManagement />} />
+        <Route path="/categories" element={<CategoriesManagement />} />
+        <Route path="/inventory" element={<InventoryManagement />} />
+        <Route path="/analytics" element={<AnalyticsReports />} />
+        <Route path="/settings" element={<AdminSettings />} />
+      </Routes>
+    </main>
+  </div>
+</div>
+
   );
 }
 
