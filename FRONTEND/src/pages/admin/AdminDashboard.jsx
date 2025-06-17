@@ -17,14 +17,14 @@ function AdminDashboard() {
   const { userInfo } = useSelector((state) => state.auth);
 
   // Check if user is admin
-//   if (!userInfo || !userInfo.isAdmin) {
-//     return <Navigate to="/auth" replace />;
-//   }
+  if (!userInfo || !userInfo.isAdmin) {
+    return <Navigate to="/auth" replace />;
+  }
 
   return (
     <div className="flex min-h-screen bg-neutral-50">
   <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-  <div className="flex-1 lg:pl-64">
+  <div className="flex-1 ">
     <AdminHeader onMenuClick={() => setSidebarOpen(true)} />
     <main className="p-4 lg:p-6">
       <Routes>

@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    image: { type: String, required: true }, // Image URL or Cloudinary link
+    image: { type: String, required: false }, // Image URL or Cloudinary link
     price: { type: Number, required: true, default: 0 },
     description: { type: String, required: true },
     category: { type: String, required: true }, // e.g., Engine, Body, Suspension
