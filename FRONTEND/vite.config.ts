@@ -9,7 +9,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:5000',
+      '/api': 'http://localhost:5002',
     },
     host: "0.0.0.0",
     port: 5173,
