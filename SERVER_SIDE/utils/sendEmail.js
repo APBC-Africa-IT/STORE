@@ -39,8 +39,8 @@ const sendEmail = async (to, subject, html) => {
  * @param {string} token - Verification token.
  */
 export const sendVerificationEmail = async (user, token) => {
-  const verificationUrl = `http://localhost:5000/api/email/verify/${token}`;
-  const resendUrl = `http://localhost:5000/api/email/resend-verification?email=${user.email}`;
+  const verificationUrl = `http://localhost:5002/api/email/verify/${token}`;
+  const resendUrl = `http://localhost:5002/api/email/resend-verification?email=${user.email}`;
 
   const html = `<p>Hi ${user.firstName},</p>
                 <p>Click the link below to verify your email:</p>

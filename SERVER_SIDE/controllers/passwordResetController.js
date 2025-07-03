@@ -30,14 +30,14 @@ const requestPasswordReset = async (req, res) => {
       const hashedToken = await bcrypt.hash(resetToken, 10);
   
       // Set token expiry (1 hour from now)
-      const expirationTime = new Date(Date.now() + 60 * 60 * 1000);
+      const expirationTime = new Date(Date.now() + 1 * 60 * 60 * 1000);
   
       user.resetPasswordToken = hashedToken;
       user.resetPasswordExpires = expirationTime;
       await user.save();
   
       // Send reset email
-      const resetLink = `http://localhost:5000/api/reset/reset-password/${resetToken}`;
+      const resetLink = `http://localhost:5002/api/reset/reset-password/${resetToken}`;
       await sendResetPasswordEmail(user.email, resetLink);
   
       res.status(200).json({ message: "Password reset email sent. Check your inbox." });
