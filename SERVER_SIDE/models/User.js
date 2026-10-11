@@ -1,68 +1,75 @@
-import mongoose from "mongoose";
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/db.js";
 
-const userSchema = mongoose.Schema(
+const User = sequelize.define(
+  "User",
   {
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
     firstName: {
-      type: String,
-      required: true,
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     lastName: {
-      type: String,
-      required: true,
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     email: {
-      type: String,
-      required: true,
+      type: DataTypes.STRING,
+      allowNull: false,
       unique: true,
     },
     password: {
-      type: String,
-      required: true,
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     isAdmin: {
-      type: Boolean,
-      default: false, // Indicates admin or customer
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     },
-
     isVerified: {
-      type: Boolean,
-      default: false, // Indicates if user has verified email
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     },
-
-    // First verification token (initial registration)
+    // Initial registration token (hashed)
     verificationToken: {
-      type: String // Token to verify email
+      type: DataTypes.STRING,
+      allowNull: true,
     },
-
     verificationTokenExpires: {
-      type: Date, // Stores the expiration time of the token
+      type: DataTypes.DATE,
+      allowNull: true,
     },
-
-    // Resent verification token (if user requests a new email)
+    // Resent verification token (hashed)
     resentVerificationToken: {
-      type: String // Token to verify email
+      type: DataTypes.STRING,
+      allowNull: true,
     },
-
     resentVerificationTokenExpires: {
-      type: Date, // Stores the expiration time of the token
+      type: DataTypes.DATE,
+      allowNull: true,
     },
-    //password reset token
+    // Password reset token (hashed)
     resetPasswordToken: {
-      type: String,
+      type: DataTypes.STRING,
+      allowNull: true,
     },
     resetPasswordExpires: {
-      type: Date,
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     isDeleted: {
-      type: Boolean,
-      default: false, // Indicates if user has been deleted
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     },
   },
   {
-    timestamps: true, // Adds createdAt and updatedAt fields
+    tableName: "users",
+    timestamps: true,
   }
 );
-
-const User = mongoose.model("User", userSchema);
 
 export default User;

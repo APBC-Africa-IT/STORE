@@ -1,0 +1,1287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── Identity & Access ───────────────────────────
+
+enum UserType {
+  CUSTOMER
+  TRADE_CUSTOMER
+  STAFF
+  SUPPLIER_USER
+  RIDER
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model User {
+  id                           String     @id @default(uuid()) @db.Uuid
+  type                         UserType   @default(CUSTOMER)
+  status                       UserStatus @default(ACTIVE)
+  email                        String?    @unique
+  phone                        String?    @unique
+  passwordHash                 String?    @map("password_hash")
+  firstName                    String?    @map("first_name")
+  lastName                     String?    @map("last_name")
+  emailVerifiedAt              DateTime?  @map("email_verified_at")
+  phoneVerifiedAt              DateTime?  @map("phone_verified_at")
+  totpSecretEnc                String?    @map("totp_secret_enc")
+  totpEnabledAt                DateTime?  @map("totp_enabled_at")
+  lastLoginAt                  DateTime?  @map("last_login_at")
+  supplierId                   String?    @map("supplier_id") @db.Uuid
+  riderId                      String?    @unique @map("rider_id") @db.Uuid
+  isDeleted                    Boolean    @default(false) @map("is_deleted")
+  createdAt                    DateTime   @default(now()) @map("created_at")
+  updatedAt                    DateTime   @updatedAt @map("updated_at")
+
+  roles           UserRole[]
+  refreshTokens   RefreshToken[]
+  addresses       Address[]
+  garage          GarageVehicle[]
+  customerProfile CustomerProfile?
+  supplier        Supplier?        @relation(fields: [supplierId], references: [id])
+  rider           Rider?           @relation(fields: [riderId], references: [id])
+
+  @@map("users")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique
+  name        String
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id    String           @id @default(uuid()) @db.Uuid
+  key   String           @unique
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  familyId   String    @map("family_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  replacedBy String?   @map("replaced_by") @db.Uuid
+  ip         String?
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+enum OtpPurpose {
+  LOGIN
+  VERIFY_PHONE
+  RESET_PASSWORD
+}
+
+model OtpCode {
+  id        String     @id @default(uuid()) @db.Uuid
+  phone     String
+  purpose   OtpPurpose
+  codeHash  String     @map("code_hash")
+  attempts  Int        @default(0)
+  expiresAt DateTime   @map("expires_at")
+  usedAt    DateTime?  @map("used_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@index([phone, purpose])
+  @@map("otp_codes")
+}
+
+enum CustomerTier {
+  RETAIL
+  TRADE_BRONZE
+  TRADE_SILVER
+  TRADE_GOLD
+}
+
+model CustomerProfile {
+  userId           String       @id @map("user_id") @db.Uuid
+  tier             CustomerTier @default(RETAIL)
+  businessName     String?      @map("business_name")
+  kraPin           String?      @map("kra_pin")
+  creditLimitCents Int          @default(0) @map("credit_limit_cents")
+  paymentTermsDays Int          @default(0) @map("payment_terms_days")
+  isWalkInOnly     Boolean      @default(false) @map("is_walk_in_only")
+  marketingOptIn   Boolean      @default(false) @map("marketing_opt_in")
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("customer_profiles")
+}
+
+model Address {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  label          String?
+  recipientName  String   @map("recipient_name")
+  phone          String
+  line1          String
+  line2          String?
+  area           String
+  city           String   @default("Nairobi")
+  lat            Float?
+  lng            Float?
+  placeId        String?  @map("place_id")
+  deliveryZoneId String?  @map("delivery_zone_id") @db.Uuid
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+// ─────────────────────────── Vehicles & Fitment ───────────────────────────
+
+model VehicleMake {
+  id     String         @id @default(uuid()) @db.Uuid
+  name   String         @unique
+  slug   String         @unique
+  models VehicleModel[]
+
+  @@map("vehicle_makes")
+}
+
+model VehicleModel {
+  id       String      @id @default(uuid()) @db.Uuid
+  makeId   String      @map("make_id") @db.Uuid
+  name     String
+  slug     String
+  make     VehicleMake @relation(fields: [makeId], references: [id])
+  vehicles Vehicle[]
+
+  @@unique([makeId, slug])
+  @@map("vehicle_models")
+}
+
+model Vehicle {
+  id          String         @id @default(uuid()) @db.Uuid
+  modelId     String         @map("model_id") @db.Uuid
+  yearFrom    Int            @map("year_from")
+  yearTo      Int            @map("year_to")
+  engine      String?
+  variant     String?
+  externalRef String?        @unique @map("external_ref")
+  vinPattern  String?        @map("vin_pattern")
+  model       VehicleModel   @relation(fields: [modelId], references: [id])
+  fitments    ProductFitment[]
+
+  @@index([modelId, yearFrom, yearTo])
+  @@map("vehicles")
+}
+
+model GarageVehicle {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  vehicleId String   @map("vehicle_id") @db.Uuid
+  year      Int
+  vin       String?
+  nickname  String?
+  isActive  Boolean  @default(false) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("garage_vehicles")
+}
+
+// ─────────────────────────── Catalogue ───────────────────────────
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum QualityGrade {
+  ECONOMY
+  STANDARD
+  PREMIUM
+}
+
+enum PartOrigin {
+  OEM
+  OES
+  AFTERMARKET
+}
+
+enum PartCondition {
+  NEW
+  USED
+  REMANUFACTURED
+}
+
+model Category {
+  id        String     @id @default(uuid()) @db.Uuid
+  parentId  String?    @map("parent_id") @db.Uuid
+  name      String
+  slug      String     @unique
+  sortOrder Int        @default(0) @map("sort_order")
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  products  Product[]
+
+  @@map("categories")
+}
+
+model Brand {
+  id         String    @id @default(uuid()) @db.Uuid
+  name       String    @unique
+  slug       String    @unique
+  logoFileId String?   @map("logo_file_id") @db.Uuid
+  products   Product[]
+
+  @@map("brands")
+}
+
+model Product {
+  id                   String        @id @default(uuid()) @db.Uuid
+  sku                  String        @unique
+  slug                 String        @unique
+  name                 String
+  description          String?
+  brandId              String?       @map("brand_id") @db.Uuid
+  categoryId           String        @map("category_id") @db.Uuid
+  status               ProductStatus @default(DRAFT)
+  qualityGrade         QualityGrade  @default(STANDARD) @map("quality_grade")
+  origin               PartOrigin    @default(AFTERMARKET)
+  condition            PartCondition @default(NEW)
+  barcode              String?       @unique
+  retailPriceCents     Int           @map("retail_price_cents")
+  salePriceCents       Int?          @map("sale_price_cents")
+  saleStartsAt         DateTime?     @map("sale_starts_at")
+  saleEndsAt           DateTime?     @map("sale_ends_at")
+  tradePriceCents      Int?          @map("trade_price_cents")
+  lastCostCents        Int?          @map("last_cost_cents")
+  avgCostCents         Int?          @map("avg_cost_cents")
+  coreChargeCents      Int           @default(0) @map("core_charge_cents")
+  vatRateBps           Int           @default(1600) @map("vat_rate_bps")
+  minMarginBps         Int?          @map("min_margin_bps")
+  lowStockThreshold    Int           @default(3) @map("low_stock_threshold")
+  reorderPoint         Int           @default(0) @map("reorder_point")
+  reorderQty           Int           @default(0) @map("reorder_qty")
+  sourcingLeadTimeMins Int?          @map("sourcing_lead_time_mins")
+  isSourceable         Boolean       @default(true) @map("is_sourceable")
+  specs                Json?
+  warrantyText         String?       @map("warranty_text")
+  seoTitle             String?       @map("seo_title")
+  seoDescription       String?       @map("seo_description")
+  weightGrams          Int?          @map("weight_grams")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  brand         Brand?                @relation(fields: [brandId], references: [id])
+  category      Category              @relation(fields: [categoryId], references: [id])
+  partNumbers   PartNumber[]
+  fitments      ProductFitment[]
+  media         ProductMedia[]
+  inventory     InventoryLevel[]
+  supplierItems SupplierCatalogItem[]
+
+  @@index([categoryId, status])
+  @@index([brandId])
+  @@map("products")
+}
+
+enum PartNumberType {
+  OEM
+  OES
+  AFTERMARKET
+  SUPERSEDED
+}
+
+model PartNumber {
+  id           String         @id @default(uuid()) @db.Uuid
+  productId    String         @map("product_id") @db.Uuid
+  type         PartNumberType
+  number       String
+  normalized   String
+  manufacturer String?
+  product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, type, normalized])
+  @@index([normalized])
+  @@map("part_numbers")
+}
+
+model ProductFitment {
+  productId String   @map("product_id") @db.Uuid
+  vehicleId String   @map("vehicle_id") @db.Uuid
+  notes     String?
+  position  String?
+  verified  Boolean  @default(false)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  @@id([productId, vehicleId])
+  @@index([vehicleId])
+  @@map("product_fitments")
+}
+
+model ProductMedia {
+  id        String  @id @default(uuid()) @db.Uuid
+  productId String  @map("product_id") @db.Uuid
+  fileId    String  @map("file_id") @db.Uuid
+  kind      String  @default("IMAGE")
+  sortOrder Int     @default(0) @map("sort_order")
+  isPrimary Boolean @default(false) @map("is_primary")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@map("product_media")
+}
+
+// ─────────────────────────── Inventory ───────────────────────────
+
+model Location {
+  id        String  @id @default(uuid()) @db.Uuid
+  code      String  @unique
+  name      String
+  isDefault Boolean @default(false) @map("is_default")
+  address   String?
+  bins      Bin[]
+
+  @@map("locations")
+}
+
+model Bin {
+  id         String   @id @default(uuid()) @db.Uuid
+  locationId String   @map("location_id") @db.Uuid
+  code       String
+  location   Location @relation(fields: [locationId], references: [id])
+
+  @@unique([locationId, code])
+  @@map("bins")
+}
+
+model InventoryLevel {
+  productId  String   @map("product_id") @db.Uuid
+  locationId String   @map("location_id") @db.Uuid
+  binId      String?  @map("bin_id") @db.Uuid
+  onHand     Int      @default(0) @map("on_hand")
+  reserved   Int      @default(0)
+  version    Int      @default(0)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@id([productId, locationId])
+  @@map("inventory_levels")
+}
+
+enum StockMovementReason {
+  SALE
+  GRN_RECEIPT
+  ADJUSTMENT_DAMAGED
+  ADJUSTMENT_COUNTED
+  ADJUSTMENT_STOLEN
+  ADJUSTMENT_PROMO_WRITE_OFF
+  ADJUSTMENT_FOUND
+  CUSTOMER_RETURN
+  DELIVERY_RETURNED
+  RETURN_TO_SUPPLIER
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+model StockMovement {
+  id            String              @id @default(uuid()) @db.Uuid
+  productId     String              @map("product_id") @db.Uuid
+  locationId    String              @map("location_id") @db.Uuid
+  quantity      Int
+  reason        StockMovementReason
+  unitCostCents Int?                @map("unit_cost_cents")
+  referenceType String?             @map("reference_type")
+  referenceId   String?             @map("reference_id") @db.Uuid
+  note          String?
+  actorId       String?             @map("actor_id") @db.Uuid
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  @@index([productId, createdAt])
+  @@index([referenceType, referenceId])
+  @@map("stock_movements")
+}
+
+enum ReservationStatus {
+  ACTIVE
+  COMMITTED
+  RELEASED
+}
+
+model StockReservation {
+  id          String            @id @default(uuid()) @db.Uuid
+  productId   String            @map("product_id") @db.Uuid
+  locationId  String            @map("location_id") @db.Uuid
+  orderItemId String            @map("order_item_id") @db.Uuid
+  quantity    Int
+  status      ReservationStatus @default(ACTIVE)
+  expiresAt   DateTime?         @map("expires_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  @@index([status, expiresAt])
+  @@index([orderItemId])
+  @@map("stock_reservations")
+}
+
+model Stocktake {
+  id           String          @id @default(uuid()) @db.Uuid
+  locationId   String          @map("location_id") @db.Uuid
+  scope        String
+  status       String          @default("OPEN")
+  startedById  String          @map("started_by_id") @db.Uuid
+  approvedById String?         @map("approved_by_id") @db.Uuid
+  createdAt    DateTime        @default(now()) @map("created_at")
+  closedAt     DateTime?       @map("closed_at")
+  lines        StocktakeLine[]
+
+  @@map("stocktakes")
+}
+
+model StocktakeLine {
+  id          String    @id @default(uuid()) @db.Uuid
+  stocktakeId String    @map("stocktake_id") @db.Uuid
+  productId   String    @map("product_id") @db.Uuid
+  binId       String?   @map("bin_id") @db.Uuid
+  systemQty   Int       @map("system_qty")
+  countedQty  Int       @map("counted_qty")
+  variance    Int
+  countedById String    @map("counted_by_id") @db.Uuid
+  stocktake   Stocktake @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+
+  @@unique([stocktakeId, productId])
+  @@map("stocktake_lines")
+}
+
+// ─────────────────────────── Cart ───────────────────────────
+
+model Cart {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String?    @unique @map("user_id") @db.Uuid
+  guestToken String?    @unique @map("guest_token")
+  promoCode  String?    @map("promo_code")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+  items      CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id              String  @id @default(uuid()) @db.Uuid
+  cartId          String  @map("cart_id") @db.Uuid
+  productId       String  @map("product_id") @db.Uuid
+  quantity        Int
+  garageVehicleId String? @map("garage_vehicle_id") @db.Uuid
+  cart            Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+// ─────────────────────────── Orders ───────────────────────────
+
+enum OrderChannel {
+  ONLINE
+  WALK_IN
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PLACED
+  CONFIRMED
+  SOURCING
+  PICKING
+  PACKED
+  READY_FOR_COLLECTION
+  DISPATCHED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentStatus {
+  UNPAID
+  DEPOSIT_PAID
+  PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  COD_PENDING
+}
+
+enum DeliveryMethod {
+  STANDARD
+  EXPRESS
+  CLICK_AND_COLLECT
+  COUNTER
+  COURIER
+}
+
+model Order {
+  id                   String         @id @default(uuid()) @db.Uuid
+  number               String         @unique
+  channel              OrderChannel
+  status               OrderStatus    @default(PENDING_PAYMENT)
+  paymentStatus        PaymentStatus  @default(UNPAID) @map("payment_status")
+  customerId           String?        @map("customer_id") @db.Uuid
+  guestEmail           String?        @map("guest_email")
+  guestPhone           String?        @map("guest_phone")
+  deliveryMethod       DeliveryMethod @map("delivery_method")
+  deliveryAddress      Json?          @map("delivery_address")
+  deliveryZoneId       String?        @map("delivery_zone_id") @db.Uuid
+  isCod                Boolean        @default(false) @map("is_cod")
+  hasSourcedItems      Boolean        @default(false) @map("has_sourced_items")
+  sourcingAcceptedAt   DateTime?      @map("sourcing_accepted_at")
+  promisedBy           DateTime?      @map("promised_by")
+  subtotalCents        Int            @map("subtotal_cents")
+  discountCents        Int            @default(0) @map("discount_cents")
+  deliveryFeeCents     Int            @default(0) @map("delivery_fee_cents")
+  vatCents             Int            @map("vat_cents")
+  totalCents           Int            @map("total_cents")
+  depositRequiredCents Int            @default(0) @map("deposit_required_cents")
+  amountPaidCents      Int            @default(0) @map("amount_paid_cents")
+  amountRefundedCents  Int            @default(0) @map("amount_refunded_cents")
+  promoCode            String?        @map("promo_code")
+  createdById          String?        @map("created_by_id") @db.Uuid
+  shiftId              String?        @map("shift_id") @db.Uuid
+  cancelledReason      String?        @map("cancelled_reason")
+  idempotencyKey       String?        @unique @map("idempotency_key")
+  version              Int            @default(0)
+  placedAt             DateTime?      @map("placed_at")
+  deliveredAt          DateTime?      @map("delivered_at")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  items         OrderItem[]
+  statusHistory OrderStatusEvent[]
+  payments      Payment[]
+  notes         OrderNote[]
+
+  @@index([status, createdAt])
+  @@index([customerId, createdAt])
+  @@index([channel, createdAt])
+  @@map("orders")
+}
+
+enum ItemFulfilmentSource {
+  STOCK
+  SOURCED
+  PRE_ORDER
+}
+
+enum ItemSourcingStatus {
+  NOT_REQUIRED
+  AWAITING_PO
+  PO_SENT
+  SUPPLIER_CONFIRMED
+  RIDER_ASSIGNED
+  COLLECTED
+  RECEIVED
+  FAILED
+}
+
+model OrderItem {
+  id                      String               @id @default(uuid()) @db.Uuid
+  orderId                 String               @map("order_id") @db.Uuid
+  productId               String?              @map("product_id") @db.Uuid
+  sku                     String
+  name                    String
+  quantity                Int
+  unitPriceCents          Int                  @map("unit_price_cents")
+  vatRateBps              Int                  @map("vat_rate_bps")
+  unitCostCents           Int?                 @map("unit_cost_cents")
+  source                  ItemFulfilmentSource
+  sourcingStatus          ItemSourcingStatus   @default(NOT_REQUIRED) @map("sourcing_status")
+  leadTimeMins            Int?                 @map("lead_time_mins")
+  purchaseOrderItemId     String?              @map("purchase_order_item_id") @db.Uuid
+  priceOverrideApprovalId String?              @map("price_override_approval_id") @db.Uuid
+  order                   Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([sourcingStatus])
+  @@map("order_items")
+}
+
+model OrderStatusEvent {
+  id                  String      @id @default(uuid()) @db.Uuid
+  orderId             String      @map("order_id") @db.Uuid
+  fromStatus          OrderStatus? @map("from_status")
+  toStatus            OrderStatus @map("to_status")
+  actorId             String?     @map("actor_id") @db.Uuid
+  note                String?
+  customerVisibleText String?     @map("customer_visible_text")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  order               Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_status_events")
+}
+
+model OrderNote {
+  id         String   @id @default(uuid()) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  authorId   String   @map("author_id") @db.Uuid
+  body       String
+  isInternal Boolean  @default(true) @map("is_internal")
+  createdAt  DateTime @default(now()) @map("created_at")
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_notes")
+}
+
+// ─────────────────────────── Payments ───────────────────────────
+
+enum PaymentMethod {
+  MPESA_STK
+  MPESA_PAYBILL
+  CARD_STRIPE
+  CARD_POS_TERMINAL
+  CASH
+  BANK_TRANSFER
+  TRADE_CREDIT
+  COD
+}
+
+enum PaymentKind {
+  FULL
+  DEPOSIT
+  BALANCE
+}
+
+enum PaymentState {
+  INITIATED
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+model Payment {
+  id                String        @id @default(uuid()) @db.Uuid
+  orderId           String        @map("order_id") @db.Uuid
+  method            PaymentMethod
+  kind              PaymentKind
+  state             PaymentState  @default(INITIATED)
+  amountCents       Int           @map("amount_cents")
+  phone             String?
+  providerRef       String?       @unique @map("provider_ref")
+  providerRequestId String?       @unique @map("provider_request_id")
+  failureReason     String?       @map("failure_reason")
+  receivedById      String?       @map("received_by_id") @db.Uuid
+  shiftId           String?       @map("shift_id") @db.Uuid
+  idempotencyKey    String?       @unique @map("idempotency_key")
+  rawCallback       Json?         @map("raw_callback")
+  succeededAt       DateTime?     @map("succeeded_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  order             Order         @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([state, createdAt])
+  @@map("payments")
+}
+
+model Refund {
+  id           String       @id @default(uuid()) @db.Uuid
+  orderId      String       @map("order_id") @db.Uuid
+  paymentId    String       @map("payment_id") @db.Uuid
+  rmaId        String?      @map("rma_id") @db.Uuid
+  amountCents  Int          @map("amount_cents")
+  state        PaymentState @default(INITIATED)
+  reason       String
+  approvedById String       @map("approved_by_id") @db.Uuid
+  providerRef  String?      @unique @map("provider_ref")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@map("refunds")
+}
+
+model WebhookEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  provider    String
+  externalId  String    @map("external_id")
+  payload     Json
+  processedAt DateTime? @map("processed_at")
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([provider, externalId])
+  @@map("webhook_events")
+}
+
+// ─────────────────────────── Procurement ───────────────────────────
+
+enum SupplierType {
+  PRIMARY
+  SECONDARY
+  SPECIALIST
+}
+
+enum SupplierStatus {
+  ACTIVE
+  SUSPENDED
+  BLACKLISTED
+}
+
+enum PaymentTerms {
+  ON_COLLECTION
+  NET_7
+  NET_14
+  NET_30
+}
+
+model Supplier {
+  id                    String         @id @default(uuid()) @db.Uuid
+  code                  String         @unique
+  name                  String
+  type                  SupplierType
+  status                SupplierStatus @default(ACTIVE)
+  statusReason          String?        @map("status_reason")
+  phone                 String
+  email                 String?
+  whatsapp              String?
+  addressLine           String         @map("address_line")
+  area                  String
+  lat                   Float?
+  lng                   Float?
+  categories            String[]
+  paymentTerms          PaymentTerms   @default(ON_COLLECTION) @map("payment_terms")
+  payoutMethod          String         @default("MPESA") @map("payout_method")
+  payoutDetailsEnc      String?        @map("payout_details_enc")
+  typicalLeadTimeMins   Int            @default(120) @map("typical_lead_time_mins")
+  portalEnabled         Boolean        @default(false) @map("portal_enabled")
+  fulfilmentRateBps     Int?           @map("fulfilment_rate_bps")
+  avgResponseMins       Int?           @map("avg_response_mins")
+  qualityPassRateBps    Int?           @map("quality_pass_rate_bps")
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  contacts       SupplierContact[]
+  catalogItems   SupplierCatalogItem[]
+  purchaseOrders PurchaseOrder[]
+  users          User[]
+
+  @@map("suppliers")
+}
+
+model SupplierContact {
+  id         String   @id @default(uuid()) @db.Uuid
+  supplierId String   @map("supplier_id") @db.Uuid
+  name       String
+  phone      String
+  role       String?
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@map("supplier_contacts")
+}
+
+model SupplierCatalogItem {
+  id               String    @id @default(uuid()) @db.Uuid
+  supplierId       String    @map("supplier_id") @db.Uuid
+  productId        String?   @map("product_id") @db.Uuid
+  supplierSku      String?   @map("supplier_sku")
+  partNumberNorm   String    @map("part_number_norm")
+  description      String
+  costCents        Int       @map("cost_cents")
+  pendingCostCents Int?      @map("pending_cost_cents")
+  availability     String    @default("UNKNOWN")
+  lastConfirmedAt  DateTime? @map("last_confirmed_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  supplier         Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product          Product?  @relation(fields: [productId], references: [id])
+
+  @@unique([supplierId, partNumberNorm])
+  @@index([productId])
+  @@index([partNumberNorm])
+  @@map("supplier_catalog_items")
+}
+
+enum PurchaseOrderKind {
+  REACTIVE
+  RESTOCK
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  SENT
+  CONFIRMED_BY_SUPPLIER
+  PARTIALLY_CONFIRMED
+  REJECTED_BY_SUPPLIER
+  RIDER_ASSIGNED
+  COLLECTED
+  RECEIVED
+  INVOICED
+  PAID
+  CANCELLED
+}
+
+enum PoChannel {
+  PORTAL
+  EMAIL
+  WHATSAPP
+  PHONE
+}
+
+model PurchaseOrder {
+  id                       String              @id @default(uuid()) @db.Uuid
+  number                   String              @unique
+  supplierId               String              @map("supplier_id") @db.Uuid
+  kind                     PurchaseOrderKind
+  status                   PurchaseOrderStatus @default(DRAFT)
+  orderId                  String?             @map("order_id") @db.Uuid
+  partRequestId            String?             @map("part_request_id") @db.Uuid
+  sentVia                  PoChannel?          @map("sent_via")
+  sentAt                   DateTime?           @map("sent_at")
+  confirmedAt              DateTime?           @map("confirmed_at")
+  requestedCollectionAt    DateTime?           @map("requested_collection_at")
+  supplierReadyAt          DateTime?           @map("supplier_ready_at")
+  collectionCodeHash       String?             @map("collection_code_hash")
+  collectionCodeExpiresAt  DateTime?           @map("collection_code_expires_at")
+  totalCostCents           Int                 @default(0) @map("total_cost_cents")
+  collectionFeeCents       Int                 @default(0) @map("collection_fee_cents")
+  otherCostsCents          Int                 @default(0) @map("other_costs_cents")
+  supplierInvoiceRef       String?             @map("supplier_invoice_ref")
+  paymentDueAt             DateTime?           @map("payment_due_at")
+  approvedById             String?             @map("approved_by_id") @db.Uuid
+  createdById              String              @map("created_by_id") @db.Uuid
+  rejectionReason          String?             @map("rejection_reason")
+  notes                    String?
+  version                  Int                 @default(0)
+  createdAt                DateTime            @default(now()) @map("created_at")
+  updatedAt                DateTime            @updatedAt @map("updated_at")
+  supplier                 Supplier            @relation(fields: [supplierId], references: [id])
+  items                    PurchaseOrderItem[]
+  grns                     Grn[]
+
+  @@index([status, createdAt])
+  @@index([supplierId, status])
+  @@index([orderId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid()) @db.Uuid
+  purchaseOrderId String        @map("purchase_order_id") @db.Uuid
+  productId       String?       @map("product_id") @db.Uuid
+  partNumber      String        @map("part_number")
+  description     String
+  quantity        Int
+  confirmedQty    Int?          @map("confirmed_qty")
+  receivedQty     Int           @default(0) @map("received_qty")
+  unitCostCents   Int           @map("unit_cost_cents")
+  orderItemId     String?       @map("order_item_id") @db.Uuid
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_order_items")
+}
+
+enum GrnStatus {
+  PENDING
+  PASSED
+  PARTIAL_PASS
+  FAILED
+}
+
+model Grn {
+  id              String        @id @default(uuid()) @db.Uuid
+  number          String        @unique
+  purchaseOrderId String        @map("purchase_order_id") @db.Uuid
+  status          GrnStatus     @default(PENDING)
+  receivedById    String        @map("received_by_id") @db.Uuid
+  logisticsJobId  String?       @map("logistics_job_id") @db.Uuid
+  notes           String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  completedAt     DateTime?     @map("completed_at")
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  lines           GrnLine[]
+
+  @@map("grns")
+}
+
+model GrnLine {
+  id                  String  @id @default(uuid()) @db.Uuid
+  grnId               String  @map("grn_id") @db.Uuid
+  purchaseOrderItemId String  @map("purchase_order_item_id") @db.Uuid
+  receivedQty         Int     @map("received_qty")
+  acceptedQty         Int     @map("accepted_qty")
+  rejectedQty         Int     @map("rejected_qty")
+  checks              Json
+  rejectionReason     String? @map("rejection_reason")
+  grn                 Grn     @relation(fields: [grnId], references: [id], onDelete: Cascade)
+
+  @@map("grn_lines")
+}
+
+// ─────────────────────────── Logistics ───────────────────────────
+
+enum RiderStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+model Rider {
+  id            String      @id @default(uuid()) @db.Uuid
+  code          String      @unique
+  name          String
+  phone         String      @unique
+  nationalIdEnc String      @map("national_id_enc")
+  bikePlate     String      @map("bike_plate")
+  mpesaNumber   String      @map("mpesa_number")
+  status        RiderStatus @default(PENDING_APPROVAL)
+  statusReason  String?     @map("status_reason")
+  isPreferred   Boolean     @default(false) @map("is_preferred")
+  isOnDuty      Boolean     @default(false) @map("is_on_duty")
+  ratingAvgX100 Int?        @map("rating_avg_x100")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  jobs          LogisticsJob[]
+  user          User?
+
+  @@map("riders")
+}
+
+model DeliveryZone {
+  id                   String  @id @default(uuid()) @db.Uuid
+  name                 String  @unique
+  feeType              String  @default("FLAT") @map("fee_type")
+  customerFeeCents     Int     @map("customer_fee_cents")
+  perKmCents           Int?    @map("per_km_cents")
+  riderFeeCents        Int     @map("rider_fee_cents")
+  expressSurchargeCents Int    @default(0) @map("express_surcharge_cents")
+  isActive             Boolean @default(true) @map("is_active")
+  polygon              Json?
+
+  @@map("delivery_zones")
+}
+
+enum JobType {
+  COLLECTION
+  DELIVERY
+}
+
+enum JobStatus {
+  CREATED
+  ASSIGNED
+  EN_ROUTE
+  COLLECTED
+  DELIVERED_TO_HUB
+  CONFIRMED
+  DELIVERED
+  CUSTOMER_CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+model LogisticsJob {
+  id             String      @id @default(uuid()) @db.Uuid
+  number         String      @unique
+  type           JobType
+  status         JobStatus   @default(CREATED)
+  riderId        String?     @map("rider_id") @db.Uuid
+  purchaseOrderId String?    @map("purchase_order_id") @db.Uuid
+  orderId        String?     @map("order_id") @db.Uuid
+  origin         Json
+  destination    Json
+  urgency        String      @default("NORMAL")
+  instructions   String?
+  codAmountCents Int         @default(0) @map("cod_amount_cents")
+  deliveryOtpHash String?    @map("delivery_otp_hash")
+  otpAttempts    Int         @default(0) @map("otp_attempts")
+  proofFileId    String?     @map("proof_file_id") @db.Uuid
+  riderFeeCents  Int         @default(0) @map("rider_fee_cents")
+  etaAt          DateTime?   @map("eta_at")
+  assignedAt     DateTime?   @map("assigned_at")
+  startedAt      DateTime?   @map("started_at")
+  completedAt    DateTime?   @map("completed_at")
+  cancelReason   String?     @map("cancel_reason")
+  createdById    String      @map("created_by_id") @db.Uuid
+  version        Int         @default(0)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  rider          Rider?      @relation(fields: [riderId], references: [id])
+  events         LogisticsJobEvent[]
+
+  @@index([status, type])
+  @@index([riderId, status])
+  @@map("logistics_jobs")
+}
+
+model LogisticsJobEvent {
+  id         String     @id @default(uuid()) @db.Uuid
+  jobId      String     @map("job_id") @db.Uuid
+  fromStatus JobStatus? @map("from_status")
+  toStatus   JobStatus  @map("to_status")
+  actorId    String?    @map("actor_id") @db.Uuid
+  lat        Float?
+  lng        Float?
+  note       String?
+  createdAt  DateTime   @default(now()) @map("created_at")
+  job        LogisticsJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("logistics_job_events")
+}
+
+model CodCollection {
+  id              String    @id @default(uuid()) @db.Uuid
+  jobId           String    @unique @map("job_id") @db.Uuid
+  orderId         String    @map("order_id") @db.Uuid
+  riderId         String    @map("rider_id") @db.Uuid
+  expectedCents   Int       @map("expected_cents")
+  reportedCents   Int?      @map("reported_cents")
+  handedOverCents Int?      @map("handed_over_cents")
+  status          String    @default("OUTSTANDING")
+  collectedAt     DateTime  @map("collected_at")
+  reconciledAt    DateTime? @map("reconciled_at")
+  reconciledById  String?   @map("reconciled_by_id") @db.Uuid
+  note            String?
+
+  @@index([riderId, status])
+  @@map("cod_collections")
+}
+
+model RiderEarning {
+  id          String   @id @default(uuid()) @db.Uuid
+  riderId     String   @map("rider_id") @db.Uuid
+  jobId       String?  @unique @map("job_id") @db.Uuid
+  amountCents Int      @map("amount_cents")
+  type        String
+  reason      String?
+  payoutId    String?  @map("payout_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([riderId, payoutId])
+  @@map("rider_earnings")
+}
+
+model Payout {
+  id             String       @id @default(uuid()) @db.Uuid
+  payeeType      String       @map("payee_type")
+  payeeId        String       @map("payee_id") @db.Uuid
+  amountCents    Int          @map("amount_cents")
+  method         String
+  state          PaymentState @default(INITIATED)
+  providerRef    String?      @unique @map("provider_ref")
+  idempotencyKey String       @unique @map("idempotency_key")
+  approvedById   String       @map("approved_by_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at")
+  completedAt    DateTime?    @map("completed_at")
+
+  @@map("payouts")
+}
+
+// ─────────────────────────── POS ───────────────────────────
+
+model Register {
+  id         String  @id @default(uuid()) @db.Uuid
+  code       String  @unique
+  locationId String  @map("location_id") @db.Uuid
+  isActive   Boolean @default(true) @map("is_active")
+
+  @@map("registers")
+}
+
+model Shift {
+  id                String    @id @default(uuid()) @db.Uuid
+  registerId        String    @map("register_id") @db.Uuid
+  openedById        String    @map("opened_by_id") @db.Uuid
+  closedById        String?   @map("closed_by_id") @db.Uuid
+  openingFloatCents Int       @map("opening_float_cents")
+  expectedCashCents Int?      @map("expected_cash_cents")
+  countedCashCents  Int?      @map("counted_cash_cents")
+  varianceCents     Int?      @map("variance_cents")
+  status            String    @default("OPEN")
+  openedAt          DateTime  @default(now()) @map("opened_at")
+  closedAt          DateTime? @map("closed_at")
+
+  @@index([registerId, status])
+  @@map("shifts")
+}
+
+model CashMovement {
+  id          String   @id @default(uuid()) @db.Uuid
+  shiftId     String   @map("shift_id") @db.Uuid
+  type        String
+  amountCents Int      @map("amount_cents")
+  referenceId String?  @map("reference_id") @db.Uuid
+  actorId     String   @map("actor_id") @db.Uuid
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([shiftId])
+  @@map("cash_movements")
+}
+
+model Approval {
+  id              String   @id @default(uuid()) @db.Uuid
+  type            String
+  requestedById   String   @map("requested_by_id") @db.Uuid
+  approvedById    String   @map("approved_by_id") @db.Uuid
+  entityType      String   @map("entity_type")
+  entityId        String?  @map("entity_id") @db.Uuid
+  context         Json
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("approvals")
+}
+
+// ─────────────────────────── Finance ───────────────────────────
+
+model LedgerAccount {
+  id       String        @id @default(uuid()) @db.Uuid
+  code     String        @unique
+  name     String
+  type     String
+  lines    JournalLine[]
+
+  @@map("ledger_accounts")
+}
+
+model JournalEntry {
+  id             String        @id @default(uuid()) @db.Uuid
+  occurredAt     DateTime      @map("occurred_at")
+  description    String
+  sourceType     String        @map("source_type")
+  sourceId       String        @map("source_id") @db.Uuid
+  idempotencyKey String        @unique @map("idempotency_key")
+  channel        OrderChannel?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  lines          JournalLine[]
+
+  @@index([sourceType, sourceId])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id          String       @id @default(uuid()) @db.Uuid
+  entryId     String       @map("entry_id") @db.Uuid
+  accountId   String       @map("account_id") @db.Uuid
+  debitCents  Int          @default(0) @map("debit_cents")
+  creditCents Int          @default(0) @map("credit_cents")
+  partyType   String?      @map("party_type")
+  partyId     String?      @map("party_id") @db.Uuid
+  entry       JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account     LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@index([partyType, partyId])
+  @@map("journal_lines")
+}
+
+// ─────────────────────────── Platform ───────────────────────────
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  actorRole  String?  @map("actor_role")
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  before     Json?
+  after      Json?
+  reason     String?
+  requestId  String?  @map("request_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
+model OutboxEvent {
+  id            String    @id @default(uuid()) @db.Uuid
+  type          String
+  aggregateType String    @map("aggregate_type")
+  aggregateId   String    @map("aggregate_id")
+  payload       Json
+  publishedAt   DateTime? @map("published_at")
+  attempts      Int       @default(0)
+  lastError     String?   @map("last_error")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([publishedAt, createdAt])
+  @@map("outbox_events")
+}
+
+model Setting {
+  key         String   @id
+  value       Json
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model FileObject {
+  id           String   @id @default(uuid()) @db.Uuid
+  bucket       String
+  key          String   @unique
+  contentType  String   @map("content_type")
+  sizeBytes    Int      @map("size_bytes")
+  isPublic     Boolean  @default(false) @map("is_public")
+  uploadedById String?  @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("file_objects")
+}
+
+model NotificationLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  channel     String
+  template    String
+  recipient   String
+  eventId     String?  @map("event_id") @db.Uuid
+  status      String   @default("QUEUED")
+  providerRef String?  @map("provider_ref")
+  error       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([eventId, channel, recipient])
+  @@map("notification_logs")
+}

@@ -1,31 +1,40 @@
-// models/Discount.js
-import mongoose from "mongoose";
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/db.js";
 
-const discountSchema = new mongoose.Schema(
+const Discount = sequelize.define(
+  "Discount",
   {
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
     code: {
-      type: String,
-      required: true,
+      type: DataTypes.STRING,
+      allowNull: false,
       unique: true,
     },
     percentage: {
-      type: Number,
-      required: true,
-      min: 1,
-      max: 100,
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      validate: {
+        min: 1,
+        max: 100,
+      },
     },
     expiryDate: {
-      type: Date,
-      required: true,
+      type: DataTypes.DATE,
+      allowNull: false,
     },
     active: {
-      type: Boolean,
-      default: true,
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
     },
   },
-  { timestamps: true }
+  {
+    tableName: "discounts",
+    timestamps: true,
+  }
 );
-
-const Discount = mongoose.model("Discount", discountSchema);
 
 export default Discount;

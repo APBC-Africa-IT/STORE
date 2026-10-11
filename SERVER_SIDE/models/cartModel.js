@@ -1,29 +1,83 @@
-import mongoose from "mongoose";
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/db.js";
+import User from "./User.js";
+import Product from "./Products.js";
 
-const cartSchema = new mongoose.Schema(
+// ── Cart ────────────────────────────────────────────────────────────────────
+const Cart = sequelize.define(
+  "Cart",
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
     },
-    cartItems: [
-      {
-        product: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-          required: true,
-        },
-        name: { type: String, required: true },
-        image: { type: String, required: true },
-        price: { type: Number, required: true },
-        quantity: { type: Number, required: true, default: 1 },
-      },
-    ],
+    userId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: { model: "users", key: "id" },
+    },
   },
-  { timestamps: true }
+  {
+    tableName: "carts",
+    timestamps: true,
+  }
 );
 
-const Cart = mongoose.model("Cart", cartSchema);
+// ── CartItem ────────────────────────────────────────────────────────────────
+// Replaces the embedded cartItems subdocument array from Mongoose.
+const CartItem = sequelize.define(
+  "CartItem",
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
+    cartId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: { model: "carts", key: "id" },
+    },
+    productId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: { model: "products", key: "id" },
+    },
+    // Snapshot fields — stored at time of adding so price changes don't
+    // retroactively affect existing cart entries.
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    image: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    price: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+    },
+    quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
+  },
+  {
+    tableName: "cart_items",
+    timestamps: true,
+  }
+);
 
-export default Cart;
+// ── Associations ────────────────────────────────────────────────────────────
+Cart.belongsTo(User, { foreignKey: "userId", as: "user" });
+User.hasOne(Cart, { foreignKey: "userId", as: "cart" });
+
+Cart.hasMany(CartItem, { foreignKey: "cartId", as: "cartItems", onDelete: "CASCADE" });
+CartItem.belongsTo(Cart, { foreignKey: "cartId" });
+
+CartItem.belongsTo(Product, { foreignKey: "productId", as: "product" });
+Product.hasMany(CartItem, { foreignKey: "productId" });
+
+export { Cart, CartItem };

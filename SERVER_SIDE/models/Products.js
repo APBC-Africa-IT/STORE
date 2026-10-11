@@ -1,24 +1,83 @@
-import mongoose from "mongoose";
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/db.js";
+import User from "./User.js";
 
-const productSchema = new mongoose.Schema(
+const Product = sequelize.define(
+  "Product",
   {
-    name: { type: String, required: true, trim: true },
-    image: { type: String, required: false }, // Image URL or Cloudinary link
-    price: { type: Number, required: true, default: 0 },
-    description: { type: String, required: true },
-    category: { type: String, required: true }, // e.g., Engine, Body, Suspension
-    carMake: { type: String, required: true }, // e.g., Toyota, Nissan
-    carModel: { type: String, required: true }, // e.g., Corolla, X-Trail
-    year: { type: String, required: true }, // Compatible years
-    condition: { type: String, enum: ["New", "Used"], required: true },
-    transmission: { type: String, enum: ["Manual", "Automatic"], required: true },
-    fuelType: { type: String, enum: ["Petrol", "Diesel"], required: true },
-    stock: { type: Number, required: true, default: 0 }, // Available quantity
-    seller: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: false }, // Now optional
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    image: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    price: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0,
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    },
+    category: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    carMake: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    carModel: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    year: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    condition: {
+      type: DataTypes.ENUM("New", "Used"),
+      allowNull: false,
+    },
+    transmission: {
+      type: DataTypes.ENUM("Manual", "Automatic"),
+      allowNull: false,
+    },
+    fuelType: {
+      type: DataTypes.ENUM("Petrol", "Diesel"),
+      allowNull: false,
+    },
+    stock: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    // nullable FK — seller is optional
+    sellerId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: "users",
+        key: "id",
+      },
+    },
   },
-  { timestamps: true }
+  {
+    tableName: "products",
+    timestamps: true,
+  }
 );
 
-const Product = mongoose.model("Product", productSchema);
+// Associations
+Product.belongsTo(User, { foreignKey: "sellerId", as: "seller" });
+User.hasMany(Product, { foreignKey: "sellerId", as: "products" });
 
 export default Product;

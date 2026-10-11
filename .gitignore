@@ -21,3 +21,9 @@ Thumbs.db
 
 # Temporary files
 tmp/
+/generated/prisma
+
+# AI agent configuration (local only)
+.agents/
+.claude/
+.windsurf/
