@@ -12,7 +12,7 @@ import { toCustomerOrder } from './orders.serializers';
 import { CancelBody, CreateOrderBody, IdempotencyKeyHeader, OrderNumberParams, QuoteBody, TrackQuery } from './orders.schemas';
 
 export const ordersService = new OrdersService(prisma, inventoryService);
-export const checkoutService = new CheckoutService(prisma, inventoryService, new InventoryRepository(prisma));
+export const checkoutService = new CheckoutService(prisma, inventoryService, new InventoryRepository(prisma), ordersService);
 
 export async function orderRoutes(app: FastifyInstance) {
   const optional = { preHandler: [app.authenticateOptional] };

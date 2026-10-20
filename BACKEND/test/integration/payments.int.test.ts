@@ -68,7 +68,8 @@ describe('M-Pesa STK push', () => {
     expect(ack.json()).toEqual({ ResultCode: 0, ResultDesc: 'Accepted' });
 
     const status = (await app.inject({ method: 'GET', url: `/api/v1/payments/${paymentId}` })).json().data;
-    expect(status).toMatchObject({ state: 'SUCCEEDED', receipt: 'SJK3XYZ001', order: { status: 'PLACED', paymentStatus: 'PAID', balanceDueCents: 0 } });
+    // paid → auto-confirmed → straight into the picking queue
+    expect(status).toMatchObject({ state: 'SUCCEEDED', receipt: 'SJK3XYZ001', order: { status: 'PICKING', paymentStatus: 'PAID', balanceDueCents: 0 } });
 
     const reservation = await prisma.stockReservation.findFirstOrThrow({ where: { productId } });
     expect(reservation.expiresAt).toBeNull(); // no longer expires
@@ -127,7 +128,7 @@ describe('M-Pesa STK push', () => {
     await callback(FakeMpesaClient.callbackBody(await checkoutIdOf(dep.paymentId), { amount: 2400 }));
 
     let order = await prisma.order.findUniqueOrThrow({ where: { number } });
-    expect(order).toMatchObject({ status: 'PLACED', paymentStatus: 'DEPOSIT_PAID', amountPaidCents: 2_400_00 });
+    expect(order).toMatchObject({ status: 'SOURCING', paymentStatus: 'DEPOSIT_PAID', amountPaidCents: 2_400_00 }); // waits for the supplier
 
     const bal = (await startMpesa(number)).json().data;
     expect(bal.amountCents).toBe(5_600_00);
@@ -143,7 +144,7 @@ describe('M-Pesa STK push', () => {
 
     await paymentsService.reconcile();
     expect((await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } })).state).toBe('SUCCEEDED');
-    expect((await prisma.order.findUniqueOrThrow({ where: { number } })).status).toBe('PLACED');
+    expect((await prisma.order.findUniqueOrThrow({ where: { number } })).status).toBe('PICKING');
   });
 
   it('money that arrives after the order expired is kept and flagged for a refund', async () => {

@@ -114,7 +114,8 @@ describe('checkout', () => {
     const p = await productWithStock(3);
     const res = await placeOrder(orderBody([{ productId: p.id, quantity: 1 }], 1_300_00, { paymentPlan: 'COD' }));
     expect(res.statusCode).toBe(201);
-    expect(res.json().data).toMatchObject({ status: 'PLACED', paymentStatus: 'COD_PENDING', paymentDueBy: null });
+    // COD is accepted immediately and auto-confirmed straight into the picking queue
+    expect(res.json().data).toMatchObject({ status: 'PICKING', paymentStatus: 'COD_PENDING', paymentDueBy: null });
     const reservation = await prisma.stockReservation.findFirstOrThrow({ where: { productId: p.id } });
     expect(reservation.expiresAt).toBeNull();
   });

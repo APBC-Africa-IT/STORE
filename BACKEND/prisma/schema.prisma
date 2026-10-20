@@ -598,6 +598,9 @@ model Order {
   cancelledReason      String?        @map("cancelled_reason")
   version              Int            @default(0)
   placedAt             DateTime?      @map("placed_at")
+  packedAt             DateTime?      @map("packed_at")
+  packedById           String?        @map("packed_by_id") @db.Uuid
+  completedAt          DateTime?      @map("completed_at")
   cancelledAt          DateTime?      @map("cancelled_at")
   deliveredAt          DateTime?      @map("delivered_at")
   createdAt            DateTime       @default(now()) @map("created_at")
@@ -606,6 +609,7 @@ model Order {
   items         OrderItem[]
   statusHistory OrderStatusEvent[]
   payments      Payment[]
+  notes         OrderNote[]
 
   @@index([status, createdAt])
   @@index([customerId, createdAt])
@@ -649,6 +653,19 @@ model OrderStatusEvent {
 
   @@index([orderId, createdAt])
   @@map("order_status_events")
+}
+
+/// Internal staff notes on an order (never shown to the customer).
+model OrderNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderId   String   @map("order_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_notes")
 }
 
 // ───────────── Payments ─────────────

@@ -5,6 +5,8 @@ import { emitEvent } from '../../shared/events/outbox';
 import type { MpesaClient } from '../../integrations/mpesa';
 import { accountReference, centsToShillings, parseStkCallback, stkFailureReason } from '../../integrations/mpesa/mpesa.helpers';
 import type { OrdersService } from '../orders/orders.service';
+import type { Actor } from '../../shared/auth/actor';
+import { recordAudit } from '../audit/audit.service';
 
 type Tx = Prisma.TransactionClient;
 const OPEN_STATES = ['INITIATED', 'PENDING'] as const;
@@ -208,6 +210,7 @@ export class PaymentsService {
         type: 'order.placed', aggregateType: 'order', aggregateId: order.id,
         payload: { orderId: order.id, number: order.number, totalCents: order.totalCents },
       });
+      await this.orders.confirmAndRoute(tx, order.id);
       return;
     }
 
@@ -222,6 +225,44 @@ export class PaymentsService {
         payload: { orderId: order.id, number: order.number, paymentId: payment.id, amountCents: payment.amountCents },
       });
     }
+  }
+
+  // ═════════════ Staff records money taken at the counter (cash, card machine, bank transfer) ═════════════
+
+  async recordManual(
+    orderNumber: string,
+    input: { method: 'CASH' | 'CARD_POS_TERMINAL' | 'BANK_TRANSFER'; amountCents: number; reference?: string | undefined },
+    actor: Actor,
+  ) {
+    const order = await this.db.order.findUnique({ where: { number: orderNumber } });
+    if (!order) throw new AppError('NOT_FOUND', 'Order not found');
+    if (order.status === 'CANCELLED') throw new AppError('CONFLICT', 'This order was cancelled');
+    const balance = order.totalCents - order.amountPaidCents;
+    if (balance <= 0) throw new AppError('CONFLICT', 'This order is already fully paid');
+    if (input.amountCents > balance) throw new AppError('VALIDATION_FAILED', `Only ${balance / 100} KES is due on this order`);
+    if (input.method !== 'CASH' && !input.reference) throw new AppError('VALIDATION_FAILED', 'A reference is required for card and bank payments');
+
+    const kind: PaymentKind = order.paymentStatus === 'UNPAID' ? (input.amountCents >= order.totalCents ? 'FULL' : 'DEPOSIT') : 'BALANCE';
+
+    return this.db.$transaction(async (tx) => {
+      const payment = await tx.payment.create({
+        data: {
+          orderId: order.id, method: input.method, kind, state: 'SUCCEEDED', amountCents: input.amountCents,
+          providerRef: input.reference ? `${input.method}:${input.reference}` : null, succeededAt: new Date(),
+        },
+      });
+      await this.applyToOrder(tx, order, payment);
+      await emitEvent(tx, {
+        type: 'payment.succeeded', aggregateType: 'payment', aggregateId: payment.id,
+        payload: { paymentId: payment.id, orderId: order.id, amountCents: payment.amountCents, method: payment.method },
+      });
+      await recordAudit(tx, {
+        actorId: actor.userId, action: 'payment.recorded', entityType: 'order', entityId: order.id,
+        after: { method: input.method, amountCents: input.amountCents, reference: input.reference ?? null },
+        ip: actor.ip, requestId: actor.requestId,
+      });
+      return payment;
+    });
   }
 
   // ═════════════ 4. Safety net (runs every minute in the worker) ═════════════

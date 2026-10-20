@@ -1,0 +1,37 @@
+@baseUrl = http://localhost:4000/api/v1
+@token = paste-admin-access-token
+@order = ORD-261020-00001
+
+### Orders waiting to be picked (with shelf locations)
+GET {{baseUrl}}/admin/fulfilment/queue
+Authorization: Bearer {{token}}
+
+### Order detail (admin sees cost + margin)
+GET {{baseUrl}}/admin/orders/{{order}}
+Authorization: Bearer {{token}}
+
+### Customer pays the rest in cash at the counter
+POST {{baseUrl}}/admin/orders/{{order}}/payments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "method": "CASH", "amountCents": 100000 }
+
+### Pack (all three checks must be true)
+POST {{baseUrl}}/admin/orders/{{order}}/pack
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "checks": { "correctParts": true, "noDamage": true, "brandedPackaging": true } }
+
+### Click & collect: ready → handed over
+POST {{baseUrl}}/admin/orders/{{order}}/ready-for-collection
+Authorization: Bearer {{token}}
+
+###
+POST {{baseUrl}}/admin/orders/{{order}}/handover
+Authorization: Bearer {{token}}
+
+### Label / packing slip (REST Client shows the PDF; use the save icon to open it)
+GET {{baseUrl}}/admin/orders/{{order}}/label.pdf
+Authorization: Bearer {{token}}

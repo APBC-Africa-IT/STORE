@@ -9,7 +9,7 @@ import type { InventoryService } from '../inventory/inventory.service';
 import { buildQuote, type Quote } from './checkout.domain';
 import { CHECKOUT_SETTINGS } from './checkout.settings';
 import { CUSTOMER_STATUS_TEXT } from './order.machine';
-import { orderInclude, type OrderWithItems } from './orders.service';
+import { orderInclude, type OrderWithItems, type OrdersService } from './orders.service';
 import type { CreateOrderBody, QuoteBody } from './orders.schemas';
 
 export class CheckoutService {
@@ -17,6 +17,7 @@ export class CheckoutService {
     private readonly db: PrismaClient,
     private readonly inventory: InventoryService,
     private readonly inventoryRepo: InventoryRepository,
+    private readonly orders: OrdersService,
   ) {}
 
   /** Price everything from the DATABASE (never trust prices sent by the client). No side effects. */
@@ -160,6 +161,8 @@ export class CheckoutService {
     for (const item of stockItems) {
       await this.inventory.reserve(tx, { productId: item.productId, quantity: item.quantity, orderItemId: item.id, expiresAt: paymentDueBy });
     }
+
+    if (isCod) await this.orders.confirmAndRoute(tx, order.id, opts.customerId);
 
     await emitEvent(tx, {
       type: isCod ? 'order.placed' : 'order.created',

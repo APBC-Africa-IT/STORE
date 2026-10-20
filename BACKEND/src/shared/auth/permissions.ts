@@ -17,6 +17,7 @@ export const PERMISSIONS = [
   'orders:update_status',
   'orders:cancel',
   'orders:refund',
+  'orders:record_payment',
   // procurement
   'procurement:create_po',
   'procurement:send_po',
@@ -45,7 +46,7 @@ export const ROLES: Record<string, { name: string; permissions: readonly Permiss
   OPERATIONS_MANAGER: {
     name: 'Operations Manager',
     permissions: [
-      'orders:read_all', 'orders:update_status', 'orders:cancel',
+      'orders:read_all', 'orders:update_status', 'orders:cancel', 'orders:record_payment',
       'inventory:view', 'inventory:adjust', 'inventory:approve_stocktake',
       'procurement:create_po', 'procurement:send_po', 'procurement:approve_restock',
       'logistics:assign', 'logistics:manage_riders', 'logistics:reconcile_cod',
@@ -56,17 +57,21 @@ export const ROLES: Record<string, { name: string; permissions: readonly Permiss
     name: 'Finance Manager',
     permissions: [
       'finance:view', 'finance:approve_below_cost', 'finance:approve_payouts',
-      'pricing:view_cost', 'orders:read_all', 'orders:refund', 'reports:export', 'inventory:view',
+      'pricing:view_cost', 'orders:read_all', 'orders:refund', 'orders:record_payment', 'reports:export', 'inventory:view',
     ],
   },
   STORE_MANAGER: {
     name: 'Store Manager',
     permissions: [
       'pos:sell', 'pos:approve_override', 'pos:manage_shift',
-      'inventory:view', 'inventory:adjust', 'inventory:approve_stocktake', 'orders:read_all',
+      'inventory:view', 'inventory:adjust', 'inventory:approve_stocktake',
+      'orders:read_all', 'orders:update_status', 'orders:cancel', 'orders:record_payment',
     ],
   },
-  SALES_STAFF: { name: 'Sales Staff', permissions: ['pos:sell', 'pos:manage_shift', 'inventory:view'] },
+  SALES_STAFF: {
+    name: 'Sales Staff',
+    permissions: ['pos:sell', 'pos:manage_shift', 'inventory:view', 'orders:read_all', 'orders:update_status', 'orders:record_payment'],
+  },
   WAREHOUSE_STAFF: {
     name: 'Warehouse Staff',
     permissions: ['orders:read_all', 'orders:update_status', 'inventory:view', 'inventory:adjust'],
