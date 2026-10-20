@@ -41,6 +41,14 @@ export class AuthRepository {
     return { roles: roleKeys, permissions: [...perms] };
   }
 
+  setPendingTotpSecret(userId: string, totpSecretEnc: string) {
+    return this.db.user.update({ where: { id: userId }, data: { totpSecretEnc, totpEnabledAt: null } });
+  }
+
+  enableTotp(db: Db, userId: string) {
+    return db.user.update({ where: { id: userId }, data: { totpEnabledAt: new Date() } });
+  }
+
   touchLastLogin(userId: string) {
     return this.db.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
   }

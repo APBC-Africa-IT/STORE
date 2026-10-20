@@ -2,11 +2,17 @@ import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import { config, isDev } from '../config/config';
+import { prisma } from '../shared/db/prisma';
+import { redis } from '../shared/redis';
+import { AppError } from '../shared/errors/app-error';
 import { registerErrorHandler } from './plugins/error-handler';
 import { registerAuth } from './plugins/auth';
+import { registerAuditHook } from './plugins/audit-hook';
 import { healthRoutes } from '../modules/health/health.routes';
 import { authRoutes } from '../modules/auth/auth.routes';
+import { auditRoutes } from '../modules/audit/audit.routes';
 
 export async function buildApp() {
   const app = Fastify({
@@ -28,16 +34,33 @@ export async function buildApp() {
     origin: config.CORS_ORIGINS.length > 0 ? config.CORS_ORIGINS : false,
     credentials: true,
   });
+  await app.register(rateLimit, {
+    global: true,
+    max: config.RATE_LIMIT_MAX,
+    timeWindow: '1 minute',
+    redis, // counters shared by all API instances
+    nameSpace: 'rl:',
+    errorResponseBuilder: (_req, ctx) =>
+      new AppError('RATE_LIMITED', `Too many requests. Try again in ${ctx.after}.`),
+  });
 
   // Errors
   registerErrorHandler(app);
 
-  // Auth (JWT + cookies + permission guards)
+  // Auth (JWT + cookies + permission guards) and audit trail
   await registerAuth(app);
+  registerAuditHook(app);
 
   // Routes
   await app.register(healthRoutes);
   await app.register(authRoutes, { prefix: '/api/v1' });
+  await app.register(auditRoutes, { prefix: '/api/v1' });
+
+  // Close connections when the app shuts down (server stop or end of tests)
+  app.addHook('onClose', async () => {
+    await prisma.$disconnect();
+    await redis.quit();
+  });
 
   return app;
 }

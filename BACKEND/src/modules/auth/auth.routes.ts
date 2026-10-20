@@ -1,29 +1,29 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { isDev } from '../../config/config';
+import { config, isDev } from '../../config/config';
 import { AppError } from '../../shared/errors/app-error';
 import { prisma } from '../../shared/db/prisma';
+import { redis } from '../../shared/redis';
 import { AuthRepository } from './auth.repository';
-import { AuthService } from './auth.service';
-import { LoginBody, RefreshBody, RegisterBody } from './auth.schemas';
+import { AuthService, type ClientInfo, type Session } from './auth.service';
+import { LoginBody, RefreshBody, RegisterBody, TwoFactorEnableBody, TwoFactorVerifyBody } from './auth.schemas';
 
 const REFRESH_COOKIE = 'ms_refresh';
 
-export async function authRoutes(app: FastifyInstance) {
-  const service = new AuthService(new AuthRepository(prisma), (payload) => app.jwt.sign(payload));
+// Strict limit for endpoints attackers like to hammer.
+const strictLimit = { rateLimit: { max: config.RATE_LIMIT_LOGIN_MAX, timeWindow: '1 minute' } };
 
-  const clientInfo = (req: FastifyRequest) => ({
-    ip: req.ip,
+export async function authRoutes(app: FastifyInstance) {
+  const service = new AuthService(new AuthRepository(prisma), redis, (payload) => app.jwt.sign(payload));
+
+  const clientInfo = (req: FastifyRequest): ClientInfo => ({
+    ...(req.ip ? { ip: req.ip } : {}),
     ...(req.headers['user-agent'] ? { userAgent: req.headers['user-agent'] } : {}),
+    requestId: req.id,
   });
 
   // Web browsers get the refresh token ONLY as an httpOnly cookie (JavaScript can't steal it).
   // Mobile/POS apps send header `x-client-type: app` and receive it in the body instead.
-  const sendSession = (
-    req: FastifyRequest,
-    reply: FastifyReply,
-    session: Awaited<ReturnType<AuthService['login']>>,
-    status = 200,
-  ) => {
+  const sendSession = (req: FastifyRequest, reply: FastifyReply, session: Session, status = 200) => {
     reply.setCookie(REFRESH_COOKIE, session.refreshToken, {
       httpOnly: true,
       secure: !isDev,
@@ -36,21 +36,40 @@ export async function authRoutes(app: FastifyInstance) {
       data: {
         user: session.user,
         accessToken: session.accessToken,
+        twoFactorSetupRequired: session.twoFactorSetupRequired,
         ...(isApp ? { refreshToken: session.refreshToken } : {}),
       },
     });
   };
 
-  app.post('/auth/register', async (req, reply) => {
+  app.post('/auth/register', { config: strictLimit }, async (req, reply) => {
     const body = RegisterBody.parse(req.body);
     const session = await service.register(body, clientInfo(req));
     return sendSession(req, reply, session, 201);
   });
 
-  app.post('/auth/login', async (req, reply) => {
+  app.post('/auth/login', { config: strictLimit }, async (req, reply) => {
     const body = LoginBody.parse(req.body);
-    const session = await service.login(body, clientInfo(req));
+    const result = await service.login(body, clientInfo(req));
+    if (result.kind === 'challenge') {
+      return reply.send({ data: { twoFactorRequired: true, challengeToken: result.challengeToken } });
+    }
+    return sendSession(req, reply, result.session);
+  });
+
+  app.post('/auth/2fa/verify', { config: strictLimit }, async (req, reply) => {
+    const body = TwoFactorVerifyBody.parse(req.body);
+    const session = await service.verifyTwoFactor(body, clientInfo(req));
     return sendSession(req, reply, session);
+  });
+
+  app.post('/auth/2fa/setup', { preHandler: [app.authenticate] }, async (req) => {
+    return { data: await service.setupTwoFactor(req.user.sub) };
+  });
+
+  app.post('/auth/2fa/enable', { preHandler: [app.authenticate], config: strictLimit }, async (req) => {
+    const body = TwoFactorEnableBody.parse(req.body);
+    return { data: await service.enableTwoFactor(req.user.sub, body.code, clientInfo(req)) };
   });
 
   app.post('/auth/refresh', async (req, reply) => {
@@ -71,7 +90,7 @@ export async function authRoutes(app: FastifyInstance) {
     return { data: await service.me(req.user.sub) };
   });
 
-  // Temporary route to prove permissions work. Delete after testing.
+  // Temporary route to prove permissions work. Delete once real admin routes exist.
   app.get(
     '/admin/ping',
     { preHandler: [app.authenticate, app.requirePermission('users:manage')] },

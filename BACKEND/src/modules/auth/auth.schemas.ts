@@ -30,3 +30,13 @@ export const LoginBody = z.object({
 export type LoginBody = z.infer<typeof LoginBody>;
 
 export const RefreshBody = z.object({ refreshToken: z.string().min(10).optional() }).optional();
+
+const totpCode = z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code from your authenticator app');
+
+export const TwoFactorEnableBody = z.object({ code: totpCode });
+
+export const TwoFactorVerifyBody = z.object({
+  challengeToken: z.string().min(10),
+  code: totpCode,
+});
+export type TwoFactorVerifyBody = z.infer<typeof TwoFactorVerifyBody>;

@@ -1,6 +1,5 @@
 import { config } from './config/config';
 import { buildApp } from './app/build-app';
-import { prisma } from './shared/db/prisma';
 
 const app = await buildApp();
 
@@ -11,11 +10,10 @@ try {
   process.exit(1);
 }
 
-// Graceful shutdown: finish in-flight requests, then close the DB pool.
+// Graceful shutdown: finish in-flight requests, then close DB + Redis (onClose hook).
 const shutdown = async (signal: string) => {
   app.log.info(`${signal} received, shutting down...`);
   await app.close();
-  await prisma.$disconnect();
   process.exit(0);
 };
 process.on('SIGINT', () => void shutdown('SIGINT'));
