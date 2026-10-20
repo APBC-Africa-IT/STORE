@@ -4,7 +4,9 @@ import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import { config, isDev } from '../config/config';
 import { registerErrorHandler } from './plugins/error-handler';
+import { registerAuth } from './plugins/auth';
 import { healthRoutes } from '../modules/health/health.routes';
+import { authRoutes } from '../modules/auth/auth.routes';
 
 export async function buildApp() {
   const app = Fastify({
@@ -30,9 +32,12 @@ export async function buildApp() {
   // Errors
   registerErrorHandler(app);
 
+  // Auth (JWT + cookies + permission guards)
+  await registerAuth(app);
+
   // Routes
   await app.register(healthRoutes);
-  // await app.register(authRoutes, { prefix: '/api/v1' });  ← Step 4
+  await app.register(authRoutes, { prefix: '/api/v1' });
 
   return app;
 }

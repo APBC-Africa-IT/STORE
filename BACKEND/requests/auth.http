@@ -1,0 +1,58 @@
+@baseUrl = http://localhost:4000/api/v1
+
+### 1. Register a customer
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "Jane",
+  "lastName": "Wanjiku",
+  "phone": "0712 345 678",
+  "password": "SuperSecret123"
+}
+
+### 2. Wrong password → 401
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "identifier": "0712345678", "password": "wrong" }
+
+### 3. Admin login (as an "app" so the refresh token comes back in the body)
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+x-client-type: app
+
+{ "identifier": "admin@myspares.co.ke", "password": "ChangeMe!2026" }
+
+### 4. Who am I?
+GET {{baseUrl}}/me
+Authorization: Bearer {{adminLogin.response.body.data.accessToken}}
+
+### 5. Admin-only route → 200 for admin
+GET {{baseUrl}}/admin/ping
+Authorization: Bearer {{adminLogin.response.body.data.accessToken}}
+
+### 6. Refresh (rotates the token)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+x-client-type: app
+
+{ "refreshToken": "{{adminLogin.response.body.data.refreshToken}}" }
+
+### 7. Use the SAME old refresh token again → 401 (theft detection kills the session)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{adminLogin.response.body.data.refreshToken}}" }
+
+### 8. Customer login, then try the admin route → 403
+# @name customerLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "identifier": "0712345678", "password": "SuperSecret123" }
+
+###
+GET {{baseUrl}}/admin/ping
+Authorization: Bearer {{customerLogin.response.body.data.accessToken}}
