@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PERMISSIONS, ROLES } from '../../src/shared/auth/permissions';
 import { hashPassword } from '../../src/shared/crypto/password';
+import { seedCatalog } from './catalog';
 
 const prisma = new PrismaClient();
 
@@ -43,6 +44,11 @@ async function main() {
       },
     });
     console.log(`✔ admin ${email} created`);
+  }
+
+  // 4. Demo catalogue (development only)
+  if (process.env.SEED_DEMO_DATA === 'true') {
+    await seedCatalog(prisma);
   }
 }
 

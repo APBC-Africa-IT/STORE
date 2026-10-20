@@ -170,3 +170,187 @@ model Setting {
 
   @@map("settings")
 }
+
+// ───────────── Vehicles & fitment ─────────────
+
+model VehicleMake {
+  id        String         @id @default(uuid()) @db.Uuid
+  name      String         @unique
+  slug      String         @unique
+  createdAt DateTime       @default(now()) @map("created_at")
+  models    VehicleModel[]
+
+  @@map("vehicle_makes")
+}
+
+model VehicleModel {
+  id        String      @id @default(uuid()) @db.Uuid
+  makeId    String      @map("make_id") @db.Uuid
+  name      String
+  slug      String
+  createdAt DateTime    @default(now()) @map("created_at")
+  make      VehicleMake @relation(fields: [makeId], references: [id])
+  vehicles  Vehicle[]
+
+  @@unique([makeId, slug])
+  @@map("vehicle_models")
+}
+
+model Vehicle {
+  id          String           @id @default(uuid()) @db.Uuid
+  modelId     String           @map("model_id") @db.Uuid
+  yearFrom    Int              @map("year_from")
+  yearTo      Int              @map("year_to")
+  engine      String? // e.g. "1.8L 2ZR-FE Petrol"
+  variant     String? // trim / body / chassis code
+  externalRef String?          @unique @map("external_ref") // TecDoc/AutoSync id later
+  createdAt   DateTime         @default(now()) @map("created_at")
+  model       VehicleModel     @relation(fields: [modelId], references: [id])
+  fitments    ProductFitment[]
+
+  @@index([modelId, yearFrom, yearTo])
+  @@map("vehicles")
+}
+
+// ───────────── Catalogue ─────────────
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum QualityGrade {
+  ECONOMY
+  STANDARD
+  PREMIUM
+}
+
+enum PartOrigin {
+  OEM
+  OES
+  AFTERMARKET
+}
+
+enum PartCondition {
+  NEW
+  USED
+  REMANUFACTURED
+}
+
+enum PartNumberType {
+  OEM
+  OES
+  AFTERMARKET
+  SUPERSEDED
+}
+
+model Category {
+  id        String     @id @default(uuid()) @db.Uuid
+  parentId  String?    @map("parent_id") @db.Uuid
+  name      String
+  slug      String     @unique
+  sortOrder Int        @default(0) @map("sort_order")
+  isActive  Boolean    @default(true) @map("is_active")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  products  Product[]
+
+  @@map("categories")
+}
+
+model Brand {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique
+  slug      String    @unique
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  products  Product[]
+
+  @@map("brands")
+}
+
+model Product {
+  id           String        @id @default(uuid()) @db.Uuid
+  sku          String        @unique
+  slug         String        @unique
+  name         String
+  description  String?
+  brandId      String?       @map("brand_id") @db.Uuid
+  categoryId   String        @map("category_id") @db.Uuid
+  status       ProductStatus @default(DRAFT)
+  qualityGrade QualityGrade  @default(STANDARD) @map("quality_grade")
+  origin       PartOrigin    @default(AFTERMARKET)
+  condition    PartCondition @default(NEW)
+  barcode      String?       @unique
+
+  // Pricing — all money in cents (KES × 100). Retail/trade are VAT-inclusive.
+  retailPriceCents Int       @map("retail_price_cents")
+  salePriceCents   Int?      @map("sale_price_cents")
+  saleStartsAt     DateTime? @map("sale_starts_at")
+  saleEndsAt       DateTime? @map("sale_ends_at")
+  tradePriceCents  Int?      @map("trade_price_cents")
+  // STAFF-ONLY cost fields (never in customer responses)
+  lastCostCents    Int?      @map("last_cost_cents")
+  avgCostCents     Int?      @map("avg_cost_cents")
+  minMarginBps     Int?      @map("min_margin_bps")
+  coreChargeCents  Int       @default(0) @map("core_charge_cents")
+  vatRateBps       Int       @default(1600) @map("vat_rate_bps")
+
+  // Inventory policy (used from the inventory step)
+  lowStockThreshold    Int     @default(3) @map("low_stock_threshold")
+  reorderPoint         Int     @default(0) @map("reorder_point")
+  reorderQty           Int     @default(0) @map("reorder_qty")
+  sourcingLeadTimeMins Int?    @map("sourcing_lead_time_mins")
+  isSourceable         Boolean @default(true) @map("is_sourceable")
+
+  // Content
+  specs          Json? // [{ "label": "Width", "value": "132 mm" }]
+  warrantyText   String? @map("warranty_text")
+  seoTitle       String? @map("seo_title")
+  seoDescription String? @map("seo_description")
+  weightGrams    Int?    @map("weight_grams")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  brand       Brand?           @relation(fields: [brandId], references: [id])
+  category    Category         @relation(fields: [categoryId], references: [id])
+  partNumbers PartNumber[]
+  fitments    ProductFitment[]
+
+  @@index([categoryId, status])
+  @@index([brandId])
+  @@map("products")
+}
+
+model PartNumber {
+  id           String         @id @default(uuid()) @db.Uuid
+  productId    String         @map("product_id") @db.Uuid
+  type         PartNumberType
+  number       String // as printed, e.g. "04465-02220"
+  normalized   String // uppercase, letters/digits only: "0446502220"
+  manufacturer String?
+  product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, type, normalized])
+  @@index([normalized])
+  @@map("part_numbers")
+}
+
+model ProductFitment {
+  productId String  @map("product_id") @db.Uuid
+  vehicleId String  @map("vehicle_id") @db.Uuid
+  notes     String?
+  position  String? // Front / Rear / Left / Right
+  verified  Boolean @default(false)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+
+  @@id([productId, vehicleId])
+  @@index([vehicleId])
+  @@map("product_fitments")
+}

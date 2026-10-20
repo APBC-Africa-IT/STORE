@@ -1,10 +1,30 @@
 import type { FastifyError, FastifyInstance } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
 import { AppError } from '../../shared/errors/app-error';
 
+type AnyError = FastifyError | AppError | ZodError | Prisma.PrismaClientKnownRequestError;
+
+/** Turn common database errors into clean API errors. */
+function fromPrisma(error: Prisma.PrismaClientKnownRequestError): AppError | null {
+  switch (error.code) {
+    case 'P2002': {
+      const target = (error.meta?.target as string[] | string | undefined) ?? 'field';
+      return new AppError('CONFLICT', `A record with this ${Array.isArray(target) ? target.join(', ') : target} already exists`);
+    }
+    case 'P2025':
+      return new AppError('NOT_FOUND', 'Record not found');
+    case 'P2003':
+      return new AppError('VALIDATION_FAILED', 'A referenced record does not exist');
+    default:
+      return null;
+  }
+}
+
 export function registerErrorHandler(app: FastifyInstance) {
-  app.setErrorHandler((error: FastifyError | AppError | ZodError, request, reply) => {
+  app.setErrorHandler((rawError: AnyError, request, reply) => {
     const requestId = request.id;
+    const error = rawError instanceof Prisma.PrismaClientKnownRequestError ? (fromPrisma(rawError) ?? rawError) : rawError;
 
     if (error instanceof AppError) {
       return reply.status(error.statusCode).send({

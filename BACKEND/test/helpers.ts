@@ -20,3 +20,14 @@ export async function createStaffUser(roleKey: string, password = 'StaffPassword
   });
   return { email, password };
 }
+
+/** Signs an access token for a new staff user with the given role (skips the 2FA dance in tests). */
+export async function staffToken(app: import('fastify').FastifyInstance, roleKey: string) {
+  const { email } = await createStaffUser(roleKey);
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { email },
+    include: { roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } },
+  });
+  const perms = [...new Set(user.roles.flatMap((r) => r.role.permissions.map((p) => p.permission.key)))];
+  return app.jwt.sign({ sub: user.id, typ: user.type, roles: user.roles.map((r) => r.role.key), perms });
+}
