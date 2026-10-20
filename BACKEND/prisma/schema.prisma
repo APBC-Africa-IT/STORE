@@ -1,0 +1,172 @@
+// MySpares database schema.
+// We grow this file module by module (see the build guide §7).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────── Identity & access ─────────────
+
+enum UserType {
+  CUSTOMER
+  TRADE_CUSTOMER
+  STAFF
+  SUPPLIER_USER
+  RIDER
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  type            UserType
+  status          UserStatus @default(ACTIVE)
+  email           String?    @unique
+  phone           String?    @unique
+  passwordHash    String?    @map("password_hash")
+  firstName       String?    @map("first_name")
+  lastName        String?    @map("last_name")
+  emailVerifiedAt DateTime?  @map("email_verified_at")
+  phoneVerifiedAt DateTime?  @map("phone_verified_at")
+  totpSecretEnc   String?    @map("totp_secret_enc")
+  totpEnabledAt   DateTime?  @map("totp_enabled_at")
+  lastLoginAt     DateTime?  @map("last_login_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  roles         UserRole[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique
+  name        String
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id    String           @id @default(uuid()) @db.Uuid
+  key   String           @unique
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  familyId   String    @map("family_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  replacedBy String?   @map("replaced_by") @db.Uuid
+  ip         String?
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+enum OtpPurpose {
+  LOGIN
+  VERIFY_PHONE
+  RESET_PASSWORD
+}
+
+model OtpCode {
+  id        String     @id @default(uuid()) @db.Uuid
+  phone     String
+  purpose   OtpPurpose
+  codeHash  String     @map("code_hash")
+  attempts  Int        @default(0)
+  expiresAt DateTime   @map("expires_at")
+  usedAt    DateTime?  @map("used_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@index([phone, purpose])
+  @@map("otp_codes")
+}
+
+// ───────────── Platform ─────────────
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  actorRole  String?  @map("actor_role")
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  before     Json?
+  after      Json?
+  reason     String?
+  requestId  String?  @map("request_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
+model OutboxEvent {
+  id            String    @id @default(uuid()) @db.Uuid
+  type          String
+  aggregateType String    @map("aggregate_type")
+  aggregateId   String    @map("aggregate_id")
+  payload       Json
+  publishedAt   DateTime? @map("published_at")
+  attempts      Int       @default(0)
+  lastError     String?   @map("last_error")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([publishedAt, createdAt])
+  @@map("outbox_events")
+}
+
+model Setting {
+  key         String   @id
+  value       Json
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}

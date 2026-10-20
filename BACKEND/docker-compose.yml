@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: myspares-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: myspares
+      POSTGRES_PASSWORD: myspares
+      POSTGRES_DB: myspares
+    ports:
+      - "5433:5432"   # 5433 on your PC, in case you already have Postgres installed on 5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myspares -d myspares"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: myspares-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:
