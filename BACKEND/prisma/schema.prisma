@@ -324,6 +324,7 @@ model Product {
   inventory      InventoryLevel[]
   stockMovements StockMovement[]
   reservations   StockReservation[]
+  supplierItems  SupplierCatalogItem[]
 
   @@index([categoryId, status])
   @@index([brandId])
@@ -734,4 +735,190 @@ model WebhookEvent {
   @@unique([provider, externalId])
   @@index([processedAt, createdAt])
   @@map("webhook_events")
+}
+
+// ───────────── Procurement: suppliers, purchase orders, goods received ─────────────
+
+enum SupplierType {
+  PRIMARY
+  SECONDARY
+  SPECIALIST
+}
+
+enum SupplierStatus {
+  ACTIVE
+  SUSPENDED
+  BLACKLISTED
+}
+
+enum PaymentTerms {
+  ON_COLLECTION
+  NET_7
+  NET_14
+  NET_30
+}
+
+model Supplier {
+  id                  String         @id @default(uuid()) @db.Uuid
+  code                String         @unique // SUP-0001
+  name                String
+  type                SupplierType
+  status              SupplierStatus @default(ACTIVE)
+  statusReason        String?        @map("status_reason")
+  contactName         String?        @map("contact_name")
+  phone               String
+  email               String?
+  whatsapp            String?
+  addressLine         String         @map("address_line")
+  area                String
+  categories          String[] // category slugs they specialise in
+  paymentTerms        PaymentTerms   @default(ON_COLLECTION) @map("payment_terms")
+  typicalLeadTimeMins Int            @default(120) @map("typical_lead_time_mins")
+  notes               String?
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+  catalog             SupplierCatalogItem[]
+  purchaseOrders      PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+enum SupplierAvailability {
+  IN_STOCK
+  LOW
+  OUT
+  UNKNOWN
+}
+
+/// A supplier's price for a part. Staff-only — never shown to customers (BR-007).
+model SupplierCatalogItem {
+  id              String               @id @default(uuid()) @db.Uuid
+  supplierId      String               @map("supplier_id") @db.Uuid
+  productId       String?              @map("product_id") @db.Uuid // matched to our product
+  partNumber      String               @map("part_number")
+  partNumberNorm  String               @map("part_number_norm")
+  description     String
+  costCents       Int                  @map("cost_cents") // VAT-exclusive
+  availability    SupplierAvailability @default(UNKNOWN)
+  lastConfirmedAt DateTime?            @map("last_confirmed_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  supplier        Supplier             @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product         Product?             @relation(fields: [productId], references: [id])
+
+  @@unique([supplierId, partNumberNorm])
+  @@index([productId])
+  @@index([partNumberNorm])
+  @@map("supplier_catalog_items")
+}
+
+enum PurchaseOrderKind {
+  REACTIVE // for a customer order (BR-003)
+  RESTOCK // proactive stock build — needs approval (BR-003)
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  CONFIRMED_BY_SUPPLIER
+  PARTIALLY_CONFIRMED
+  REJECTED_BY_SUPPLIER
+  RIDER_ASSIGNED
+  COLLECTED
+  RECEIVED
+  CANCELLED
+}
+
+enum PoChannel {
+  PORTAL
+  EMAIL
+  WHATSAPP
+  PHONE
+}
+
+model PurchaseOrder {
+  id                 String              @id @default(uuid()) @db.Uuid
+  number             String              @unique // PO-2610-00001
+  supplierId         String              @map("supplier_id") @db.Uuid
+  kind               PurchaseOrderKind
+  status             PurchaseOrderStatus @default(DRAFT)
+  sentVia            PoChannel?          @map("sent_via")
+  sentAt             DateTime?           @map("sent_at")
+  confirmedAt        DateTime?           @map("confirmed_at")
+  supplierReadyAt    DateTime?           @map("supplier_ready_at")
+  rejectionReason    String?             @map("rejection_reason")
+  collectionCodeHash String?             @map("collection_code_hash")
+  totalCostCents     Int                 @default(0) @map("total_cost_cents")
+  collectionFeeCents Int                 @default(0) @map("collection_fee_cents") // boda boda trip → landed cost
+  otherCostsCents    Int                 @default(0) @map("other_costs_cents")
+  createdById        String              @map("created_by_id") @db.Uuid
+  approvedById       String?             @map("approved_by_id") @db.Uuid
+  notes              String?
+  version            Int                 @default(0)
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  supplier           Supplier            @relation(fields: [supplierId], references: [id])
+  items              PurchaseOrderItem[]
+  grns               Grn[]
+
+  @@index([status, createdAt])
+  @@index([supplierId, status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid()) @db.Uuid
+  purchaseOrderId String        @map("purchase_order_id") @db.Uuid
+  productId       String        @map("product_id") @db.Uuid
+  orderItemId     String?       @unique @map("order_item_id") @db.Uuid // reactive: the customer's order line
+  partNumber      String        @map("part_number")
+  description     String
+  quantity        Int
+  confirmedQty    Int?          @map("confirmed_qty")
+  receivedQty     Int           @default(0) @map("received_qty") // accepted + rejected so far
+  unitCostCents   Int           @map("unit_cost_cents")
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  grnLines        GrnLine[]
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_items")
+}
+
+enum GrnStatus {
+  PASSED
+  PARTIAL_PASS
+  FAILED
+}
+
+/// Goods Received Note: what physically arrived at the hub and passed the quality check.
+model Grn {
+  id              String        @id @default(uuid()) @db.Uuid
+  number          String        @unique // GRN-2610-00001
+  purchaseOrderId String        @map("purchase_order_id") @db.Uuid
+  status          GrnStatus
+  receivedById    String        @map("received_by_id") @db.Uuid
+  notes           String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  lines           GrnLine[]
+
+  @@index([purchaseOrderId])
+  @@map("grns")
+}
+
+model GrnLine {
+  id                  String            @id @default(uuid()) @db.Uuid
+  grnId               String            @map("grn_id") @db.Uuid
+  purchaseOrderItemId String            @map("purchase_order_item_id") @db.Uuid
+  receivedQty         Int               @map("received_qty")
+  acceptedQty         Int               @map("accepted_qty")
+  rejectedQty         Int               @map("rejected_qty")
+  landedUnitCostCents Int               @map("landed_unit_cost_cents")
+  checks              Json // { correctPart, correctQty, noDamage }
+  rejectionReason     String?           @map("rejection_reason")
+  grn                 Grn               @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  purchaseOrderItem   PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id])
+
+  @@map("grn_lines")
 }

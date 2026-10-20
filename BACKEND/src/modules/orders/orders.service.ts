@@ -13,7 +13,7 @@ export const orderInclude = {
 } satisfies Prisma.OrderInclude;
 export type OrderWithItems = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 
-// Customers may cancel until the parcel is packed. (The procurement step adds: not after a supplier PO is sent.)
+// Customers may cancel until the parcel is packed, and only before any supplier PO is sent.
 const CUSTOMER_CANCELLABLE: OrderStatus[] = ['PENDING_PAYMENT', 'PLACED', 'CONFIRMED', 'SOURCING', 'PICKING'];
 
 export class OrdersService {
@@ -90,6 +90,14 @@ export class OrdersService {
     }
   }
 
+  /** Adds a customer-visible line to the order timeline without changing the status ("Track your sourcing"). */
+  async addTimelineEvent(tx: Tx, orderId: string, customerText: string, note?: string) {
+    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } });
+    await tx.orderStatusEvent.create({
+      data: { orderId, fromStatus: order.status, toStatus: order.status, customerVisibleText: customerText, note: note ?? null },
+    });
+  }
+
   async findByNumber(number: string) {
     return this.db.order.findUnique({ where: { number }, include: orderInclude });
   }
@@ -108,7 +116,9 @@ export class OrdersService {
   async cancelByCustomer(number: string, customerId: string, reason: string) {
     const order = await this.findByNumber(number);
     if (!order || order.customerId !== customerId) throw new AppError('NOT_FOUND', 'Order not found');
-    if (!CUSTOMER_CANCELLABLE.includes(order.status)) {
+    const supplierInvolved = order.items.some((i) => !['NOT_REQUIRED', 'AWAITING_PO', 'FAILED'].includes(i.sourcingStatus));
+    if (!CUSTOMER_CANCELLABLE.includes(order.status) || supplierInvolved) {
+      // BR-008 spirit: once we've committed to a supplier, cancellation needs a human.
       throw new AppError('INVALID_STATE_TRANSITION', 'This order can no longer be cancelled online. Please contact us.');
     }
     await this.db.$transaction((tx) => this.cancel(tx, order, { reason, actorId: customerId }));

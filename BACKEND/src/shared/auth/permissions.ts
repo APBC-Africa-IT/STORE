@@ -23,6 +23,8 @@ export const PERMISSIONS = [
   'procurement:send_po',
   'procurement:approve_restock',
   'procurement:approve_supplier_prices',
+  'procurement:manage_suppliers',
+  'procurement:receive_goods',
   // logistics
   'logistics:assign',
   'logistics:manage_riders',
@@ -49,6 +51,7 @@ export const ROLES: Record<string, { name: string; permissions: readonly Permiss
       'orders:read_all', 'orders:update_status', 'orders:cancel', 'orders:record_payment',
       'inventory:view', 'inventory:adjust', 'inventory:approve_stocktake',
       'procurement:create_po', 'procurement:send_po', 'procurement:approve_restock',
+      'procurement:manage_suppliers', 'procurement:receive_goods',
       'logistics:assign', 'logistics:manage_riders', 'logistics:reconcile_cod',
       'catalog:write', 'reports:export',
     ],
@@ -66,6 +69,7 @@ export const ROLES: Record<string, { name: string; permissions: readonly Permiss
       'pos:sell', 'pos:approve_override', 'pos:manage_shift',
       'inventory:view', 'inventory:adjust', 'inventory:approve_stocktake',
       'orders:read_all', 'orders:update_status', 'orders:cancel', 'orders:record_payment',
+      'procurement:receive_goods',
     ],
   },
   SALES_STAFF: {
@@ -74,11 +78,14 @@ export const ROLES: Record<string, { name: string; permissions: readonly Permiss
   },
   WAREHOUSE_STAFF: {
     name: 'Warehouse Staff',
-    permissions: ['orders:read_all', 'orders:update_status', 'inventory:view', 'inventory:adjust'],
+    permissions: ['orders:read_all', 'orders:update_status', 'inventory:view', 'inventory:adjust', 'procurement:receive_goods'],
   },
   PROCUREMENT_OFFICER: {
     name: 'Procurement Officer',
-    permissions: ['procurement:create_po', 'procurement:send_po', 'orders:read_all', 'inventory:view'],
+    permissions: [
+      'procurement:create_po', 'procurement:send_po', 'procurement:manage_suppliers', 'procurement:receive_goods',
+      'orders:read_all', 'inventory:view',
+    ],
   },
   DISPATCHER: {
     name: 'Dispatcher',

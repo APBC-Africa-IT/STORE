@@ -4,6 +4,7 @@ import { PERMISSIONS, ROLES } from '../../src/shared/auth/permissions';
 import { hashPassword } from '../../src/shared/crypto/password';
 import { seedCatalog } from './catalog';
 import { seedZones } from './zones';
+import { seedSuppliers } from './suppliers';
 
 const prisma = new PrismaClient();
 
@@ -59,6 +60,7 @@ async function main() {
   if (process.env.SEED_DEMO_DATA === 'true') {
     await seedCatalog(prisma);
     await seedZones(prisma);
+    await seedSuppliers(prisma);
   }
 }
 

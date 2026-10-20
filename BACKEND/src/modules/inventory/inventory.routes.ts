@@ -4,9 +4,10 @@ import { prisma } from '../../shared/db/prisma';
 import { actorFrom, can } from '../../shared/auth/actor';
 import { InventoryRepository } from './inventory.repository';
 import { InventoryService } from './inventory.service';
+import { SuppliersService } from '../procurement/suppliers.service';
 import { AdjustmentBody, BinCreateBody, MovementsQuery, SetBinBody } from './inventory.schemas';
 
-export const inventoryService = new InventoryService(new InventoryRepository(prisma));
+export const inventoryService = new InventoryService(new InventoryRepository(prisma), new SuppliersService(prisma));
 
 const ProductParams = z.object({ productId: z.uuid() });
 

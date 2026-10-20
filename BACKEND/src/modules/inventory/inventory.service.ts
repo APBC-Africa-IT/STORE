@@ -17,10 +17,18 @@ type ProductForAvailability = {
   sourcingLeadTimeMins: number | null;
 };
 
+/** Anything that knows how fast suppliers can deliver a product (the procurement module). */
+export interface SourcingLeadTimes {
+  bestLeadTimes(productIds: string[]): Promise<Map<string, number>>;
+}
+
 export class InventoryService {
   private defaultLocation: string | null = null;
 
-  constructor(private readonly repo: InventoryRepository) {}
+  constructor(
+    private readonly repo: InventoryRepository,
+    private readonly sourcing?: SourcingLeadTimes,
+  ) {}
 
   private get db() {
     return this.repo.db;
@@ -37,7 +45,11 @@ export class InventoryService {
   // ───────────── Availability (what customers see) ─────────────
 
   async availabilityFor(products: ProductForAvailability[], now = new Date()): Promise<Map<string, Availability>> {
-    const levels = await this.repo.availableByProduct(products.map((p) => p.id));
+    const ids = products.map((p) => p.id);
+    const [levels, supplierLeadTimes] = await Promise.all([
+      this.repo.availableByProduct(ids),
+      this.sourcing ? this.sourcing.bestLeadTimes(ids) : Promise.resolve(new Map<string, number>()),
+    ]);
     return new Map(
       products.map((p) => {
         const level = levels.get(p.id);
@@ -49,14 +61,21 @@ export class InventoryService {
               available,
               lowStockThreshold: p.lowStockThreshold,
               isSourceable: p.isSourceable,
-              hasSourcingCandidate: p.isSourceable, // procurement step: "a supplier actually stocks it"
-              sourcingLeadTimeMins: p.sourcingLeadTimeMins,
+              hasSourcingCandidate: p.isSourceable,
+              // A supplier's real lead time beats the product's default estimate.
+              sourcingLeadTimeMins: supplierLeadTimes.get(p.id) ?? p.sourcingLeadTimeMins,
             },
             now,
           ),
         ];
       }),
     );
+  }
+
+  /** Units not promised to anyone right now (use inside a transaction). */
+  async freeStock(tx: Db, productId: string) {
+    const level = (await this.repo.availableByProduct([productId], tx)).get(productId);
+    return level ? level.onHand - level.reserved : 0;
   }
 
   // ───────────── Reservations (used by orders & POS) ─────────────

@@ -1,0 +1,47 @@
+@baseUrl = http://localhost:4000/api/v1
+@token = paste-admin-access-token
+
+### 1. What's waiting for a supplier?
+GET {{baseUrl}}/admin/sourcing/queue
+Authorization: Bearer {{token}}
+
+### 2. Who can supply it? (paste productId from step 1)
+GET {{baseUrl}}/admin/sourcing/candidates?productId=PASTE
+Authorization: Bearer {{token}}
+
+### 3. Raise the PO (supplierId from step 2, orderItemId from step 1)
+POST {{baseUrl}}/admin/purchase-orders/reactive
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "supplierId": "PASTE", "orderItemIds": ["PASTE"] }
+
+### 4. Send it (we phoned the supplier)
+POST {{baseUrl}}/admin/purchase-orders/PO-2610-00001/send
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "channel": "PHONE" }
+
+### 5. Supplier confirmed → note the collectionCode (shown once!)
+POST {{baseUrl}}/admin/purchase-orders/PO-2610-00001/supplier-response
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "response": "CONFIRMED" }
+
+### 6. Part arrives, passes QC (purchaseOrderItemId from the PO detail; boda fee KES 200)
+POST {{baseUrl}}/admin/grns
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "purchaseOrderNumber": "PO-2610-00001",
+  "collectionFeeCents": 20000,
+  "lines": [{ "purchaseOrderItemId": "PASTE", "receivedQty": 1, "acceptedQty": 1,
+              "checks": { "correctPart": true, "correctQty": true, "noDamage": true } }]
+}
+
+### Purchase order PDF (to send to the supplier)
+GET {{baseUrl}}/admin/purchase-orders/PO-2610-00001/pdf
+Authorization: Bearer {{token}}

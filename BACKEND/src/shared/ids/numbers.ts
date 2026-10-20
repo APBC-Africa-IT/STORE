@@ -2,14 +2,35 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
-/** "261020" for 20 Oct 2026 in Nairobi time. */
-function eatYyMmDd(date = new Date()): string {
-  const eat = new Date(date.getTime() + 3 * 60 * 60 * 1000);
-  return eat.toISOString().slice(2, 10).replace(/-/g, '');
+/** Date parts in Nairobi time: { yymmdd: "261020", yymm: "2610" } */
+function eatDate(date = new Date()) {
+  const iso = new Date(date.getTime() + 3 * 60 * 60 * 1000).toISOString();
+  const yymmdd = iso.slice(2, 10).replace(/-/g, '');
+  return { yymmdd, yymm: yymmdd.slice(0, 4) };
 }
 
-/** ORD-261020-00042 — human-friendly, unique (backed by a Postgres sequence). */
-export async function nextOrderNumber(db: Db): Promise<string> {
-  const [row] = await db.$queryRaw<Array<{ n: bigint }>>`SELECT nextval('order_number_seq') AS n`;
-  return `ORD-${eatYyMmDd()}-${String(row!.n).padStart(5, '0')}`;
+async function nextval(db: Db, sequence: 'order_number_seq' | 'po_number_seq' | 'grn_number_seq' | 'supplier_code_seq') {
+  // The sequence name comes from the fixed list above, never from user input.
+  const [row] = await db.$queryRawUnsafe<Array<{ n: bigint }>>(`SELECT nextval('${sequence}') AS n`);
+  return String(row!.n);
+}
+
+/** ORD-261020-00042 */
+export async function nextOrderNumber(db: Db) {
+  return `ORD-${eatDate().yymmdd}-${(await nextval(db, 'order_number_seq')).padStart(5, '0')}`;
+}
+
+/** PO-2610-00007 */
+export async function nextPoNumber(db: Db) {
+  return `PO-${eatDate().yymm}-${(await nextval(db, 'po_number_seq')).padStart(5, '0')}`;
+}
+
+/** GRN-2610-00003 */
+export async function nextGrnNumber(db: Db) {
+  return `GRN-${eatDate().yymm}-${(await nextval(db, 'grn_number_seq')).padStart(5, '0')}`;
+}
+
+/** SUP-0012 */
+export async function nextSupplierCode(db: Db) {
+  return `SUP-${(await nextval(db, 'supplier_code_seq')).padStart(4, '0')}`;
 }
