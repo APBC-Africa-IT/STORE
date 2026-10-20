@@ -69,9 +69,9 @@ export class InventoryRepository {
   }
 
   /** available (on_hand - reserved) per product, summed over locations. */
-  async availableByProduct(productIds: string[]) {
+  async availableByProduct(productIds: string[], db: Db = this.db) {
     if (productIds.length === 0) return new Map<string, { onHand: number; reserved: number }>();
-    const rows = await this.db.$queryRaw<Array<{ product_id: string; on_hand: number; reserved: number }>>`
+    const rows = await db.$queryRaw<Array<{ product_id: string; on_hand: number; reserved: number }>>`
       SELECT product_id::text, SUM(on_hand)::int AS on_hand, SUM(reserved)::int AS reserved
         FROM inventory_levels
        WHERE product_id = ANY(${productIds}::uuid[])

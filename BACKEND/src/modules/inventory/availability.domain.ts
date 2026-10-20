@@ -51,10 +51,7 @@ export function computeAvailability(
     return { status: 'PRE_ORDER', label: `Pre-Order — Expected ${formatReadyBy(input.expectedRestockAt, now)}`, expectedAt: input.expectedRestockAt.toISOString() };
   }
   if (input.isSourceable && input.hasSourcingCandidate) {
-    const leadTimeMins = (input.sourcingLeadTimeMins ?? settings.defaultSourcingMins) + settings.hubProcessingMins;
-    // After the same-day cut-off, sourcing starts at the next business opening.
-    const start = isAfterCutoff(now, settings.sameDayCutoff) ? nextBusinessDayOpen(now, settings.hours) : now;
-    const readyBy = addBusinessMinutes(start, leadTimeMins, settings.hours);
+    const { leadTimeMins, readyBy } = estimateSourcedReadyBy(input.sourcingLeadTimeMins, now, settings);
     return {
       status: 'AVAILABLE_TO_ORDER',
       label: `Available to Order — Ready ${formatReadyBy(readyBy, now)}`,
@@ -63,4 +60,21 @@ export function computeAvailability(
     };
   }
   return { status: 'RARE_PART_REQUEST', label: 'Rare Part — Submit a Request' };
+}
+
+/** When a part we must source from a supplier will be packed and ready (respects the same-day cut-off). */
+export function estimateSourcedReadyBy(
+  sourcingLeadTimeMins: number | null,
+  now = new Date(),
+  settings: AvailabilitySettings = DEFAULT_AVAILABILITY_SETTINGS,
+) {
+  const leadTimeMins = (sourcingLeadTimeMins ?? settings.defaultSourcingMins) + settings.hubProcessingMins;
+  // After the same-day cut-off, sourcing starts at the next business opening.
+  const start = isAfterCutoff(now, settings.sameDayCutoff) ? nextBusinessDayOpen(now, settings.hours) : now;
+  return { leadTimeMins, readyBy: addBusinessMinutes(start, leadTimeMins, settings.hours) };
+}
+
+/** When an in-stock part will be picked, packed and ready. */
+export function estimateInStockReadyBy(now = new Date(), settings: AvailabilitySettings = DEFAULT_AVAILABILITY_SETTINGS) {
+  return addBusinessMinutes(now, settings.hubProcessingMins, settings.hours);
 }

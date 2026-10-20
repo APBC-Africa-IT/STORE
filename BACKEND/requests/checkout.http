@@ -1,0 +1,41 @@
+@baseUrl = http://localhost:4000/api/v1
+# Demo data IDs (from `pnpm db:seed`). Re-check with GET /products and GET /delivery-zones if you rebuild the database.
+@productId = 5094d99d-67ab-4102-b038-5176d31a4c4b
+@shockId = c0986922-4df8-48e5-a4ba-dff48ec98519
+@zoneId = 2cf887f0-6b2e-4503-900d-7c35b29695e1
+
+### Delivery zones
+GET {{baseUrl}}/delivery-zones
+
+### Quote: 2 brake pads (in stock) + 1 shock absorber (sourced), 30% deposit
+POST {{baseUrl}}/checkout/quote
+Content-Type: application/json
+
+{
+  "items": [
+    { "productId": "{{productId}}", "quantity": 2 },
+    { "productId": "{{shockId}}", "quantity": 1 }
+  ],
+  "deliveryMethod": "STANDARD",
+  "deliveryZoneId": "{{zoneId}}",
+  "paymentPlan": "DEPOSIT"
+}
+
+### Place the order (put the totalCents from the quote in expectedTotalCents)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+Idempotency-Key: 6f1c2a9e-5b7d-4e1a-9c3f-2d8b7a6e5f40
+
+{
+  "items": [
+    { "productId": "{{productId}}", "quantity": 2 },
+    { "productId": "{{shockId}}", "quantity": 1 }
+  ],
+  "deliveryMethod": "STANDARD",
+  "deliveryZoneId": "{{zoneId}}",
+  "paymentPlan": "DEPOSIT",
+  "expectedTotalCents": 1680000,
+  "acceptSourcingLeadTime": true,
+  "contact": { "name": "Jane Wanjiku", "phone": "0712 345 678" },
+  "address": { "line1": "Ring Road, Apt 4", "area": "Westlands" }
+}

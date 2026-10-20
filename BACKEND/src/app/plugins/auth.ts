@@ -16,6 +16,7 @@ declare module '@fastify/jwt' {
 declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    authenticateOptional: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     requirePermission: (permission: Permission) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
@@ -29,6 +30,17 @@ export async function registerAuth(app: FastifyInstance) {
 
   // Use as: { preHandler: [app.authenticate] }
   app.decorate('authenticate', async (request: FastifyRequest) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      throw new AppError('UNAUTHENTICATED', 'Missing or invalid access token');
+    }
+  });
+
+  // For routes guests AND logged-in users can call (cart, checkout).
+  // No Authorization header → guest. A header that is present but invalid → 401.
+  app.decorate('authenticateOptional', async (request: FastifyRequest) => {
+    if (!request.headers.authorization) return;
     try {
       await request.jwtVerify();
     } catch {

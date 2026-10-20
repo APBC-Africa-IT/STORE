@@ -460,3 +460,192 @@ model StockReservation {
   @@index([orderItemId])
   @@map("stock_reservations")
 }
+
+// ───────────── Delivery zones ─────────────
+
+model DeliveryZone {
+  id                    String   @id @default(uuid()) @db.Uuid
+  name                  String   @unique // Westlands, Kilimani…
+  slug                  String   @unique
+  customerFeeCents      Int      @map("customer_fee_cents") // what the customer pays (VAT-inclusive)
+  riderFeeCents         Int      @map("rider_fee_cents") // what we pay the boda boda rider
+  expressSurchargeCents Int      @default(0) @map("express_surcharge_cents")
+  isActive              Boolean  @default(true) @map("is_active")
+  sortOrder             Int      @default(0) @map("sort_order")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("delivery_zones")
+}
+
+// ───────────── Cart (never reserves stock — BR-002) ─────────────
+
+model Cart {
+  id             String     @id @default(uuid()) @db.Uuid
+  userId         String?    @unique @map("user_id") @db.Uuid
+  guestTokenHash String?    @unique @map("guest_token_hash")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  items          CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  cartId    String   @map("cart_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  quantity  Int
+  createdAt DateTime @default(now()) @map("created_at")
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+// ───────────── Orders ─────────────
+
+enum OrderChannel {
+  ONLINE
+  WALK_IN
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PLACED
+  CONFIRMED
+  SOURCING
+  PICKING
+  PACKED
+  READY_FOR_COLLECTION
+  DISPATCHED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentStatus {
+  UNPAID
+  DEPOSIT_PAID
+  PAID
+  COD_PENDING
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum DeliveryMethod {
+  STANDARD
+  EXPRESS
+  CLICK_AND_COLLECT
+  COUNTER
+}
+
+enum PaymentPlan {
+  FULL
+  DEPOSIT
+  COD
+}
+
+enum ItemSource {
+  STOCK
+  SOURCED
+}
+
+enum ItemSourcingStatus {
+  NOT_REQUIRED
+  AWAITING_PO
+  PO_SENT
+  SUPPLIER_CONFIRMED
+  RIDER_ASSIGNED
+  COLLECTED
+  RECEIVED
+  FAILED
+}
+
+model Order {
+  id                   String         @id @default(uuid()) @db.Uuid
+  number               String         @unique // ORD-261020-00042
+  channel              OrderChannel
+  status               OrderStatus    @default(PENDING_PAYMENT)
+  paymentStatus        PaymentStatus  @default(UNPAID) @map("payment_status")
+  paymentPlan          PaymentPlan    @map("payment_plan")
+  customerId           String?        @map("customer_id") @db.Uuid
+  contactName          String         @map("contact_name")
+  contactPhone         String         @map("contact_phone")
+  contactEmail         String?        @map("contact_email")
+  deliveryMethod       DeliveryMethod @map("delivery_method")
+  deliveryAddress      Json?          @map("delivery_address") // snapshot at order time
+  deliveryZoneId       String?        @map("delivery_zone_id") @db.Uuid
+  hasSourcedItems      Boolean        @default(false) @map("has_sourced_items")
+  sourcingAcceptedAt   DateTime?      @map("sourcing_accepted_at")
+  promisedBy           DateTime?      @map("promised_by")
+
+  // Money (cents, VAT-inclusive)
+  subtotalCents        Int            @map("subtotal_cents")
+  discountCents        Int            @default(0) @map("discount_cents")
+  deliveryFeeCents     Int            @default(0) @map("delivery_fee_cents")
+  vatCents             Int            @map("vat_cents")
+  totalCents           Int            @map("total_cents")
+  depositRequiredCents Int            @default(0) @map("deposit_required_cents")
+  amountPaidCents      Int            @default(0) @map("amount_paid_cents")
+  amountRefundedCents  Int            @default(0) @map("amount_refunded_cents")
+
+  paymentDueBy         DateTime?      @map("payment_due_by") // unpaid orders auto-cancel after this
+  idempotencyKey       String?        @unique @map("idempotency_key")
+  requestHash          String?        @map("request_hash")
+  createdById          String?        @map("created_by_id") @db.Uuid // staff (POS)
+  cancelledReason      String?        @map("cancelled_reason")
+  version              Int            @default(0)
+  placedAt             DateTime?      @map("placed_at")
+  cancelledAt          DateTime?      @map("cancelled_at")
+  deliveredAt          DateTime?      @map("delivered_at")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  items         OrderItem[]
+  statusHistory OrderStatusEvent[]
+
+  @@index([status, createdAt])
+  @@index([customerId, createdAt])
+  @@index([status, paymentDueBy])
+  @@map("orders")
+}
+
+model OrderItem {
+  id             String             @id @default(uuid()) @db.Uuid
+  orderId        String             @map("order_id") @db.Uuid
+  productId      String             @map("product_id") @db.Uuid
+  sku            String // snapshot
+  name           String // snapshot
+  quantity       Int
+  unitPriceCents Int                @map("unit_price_cents") // VAT-inclusive
+  lineTotalCents Int                @map("line_total_cents")
+  vatRateBps     Int                @map("vat_rate_bps")
+  vatCents       Int                @map("vat_cents")
+  unitCostCents  Int?               @map("unit_cost_cents") // STAFF-ONLY, set at fulfilment
+  source         ItemSource
+  sourcingStatus ItemSourcingStatus @default(NOT_REQUIRED) @map("sourcing_status")
+  leadTimeMins   Int?               @map("lead_time_mins")
+  readyBy        DateTime?          @map("ready_by")
+  order          Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([sourcingStatus])
+  @@map("order_items")
+}
+
+model OrderStatusEvent {
+  id                  String       @id @default(uuid()) @db.Uuid
+  orderId             String       @map("order_id") @db.Uuid
+  fromStatus          OrderStatus? @map("from_status")
+  toStatus            OrderStatus  @map("to_status")
+  actorId             String?      @map("actor_id") @db.Uuid
+  note                String?
+  customerVisibleText String?      @map("customer_visible_text")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  order               Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_status_events")
+}

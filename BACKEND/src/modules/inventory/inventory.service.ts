@@ -26,9 +26,9 @@ export class InventoryService {
     return this.repo.db;
   }
 
-  async defaultLocationId(): Promise<string> {
+  async defaultLocationId(db: Db = this.db): Promise<string> {
     if (this.defaultLocation) return this.defaultLocation;
-    const loc = await this.db.location.findFirst({ where: { isDefault: true } });
+    const loc = await db.location.findFirst({ where: { isDefault: true } });
     if (!loc) throw new AppError('INTERNAL', 'No default location configured. Run `pnpm db:seed`.');
     this.defaultLocation = loc.id;
     return loc.id;
@@ -63,10 +63,11 @@ export class InventoryService {
 
   /** Hold stock for an order item. Call inside the order's transaction. */
   async reserve(tx: Db, input: { productId: string; quantity: number; orderItemId?: string; expiresAt?: Date | null }) {
-    const locationId = await this.defaultLocationId();
+    const locationId = await this.defaultLocationId(tx);
     const level = await this.repo.reserve(tx, input.productId, locationId, input.quantity);
     if (!level) {
-      const current = (await this.repo.availableByProduct([input.productId])).get(input.productId);
+      // Use `tx` for every query inside a transaction (another connection could deadlock the pool).
+      const current = (await this.repo.availableByProduct([input.productId], tx)).get(input.productId);
       const available = current ? current.onHand - current.reserved : 0;
       throw new AppError('INSUFFICIENT_STOCK', `Only ${available} available`, {
         productId: input.productId, requested: input.quantity, available,
@@ -125,7 +126,7 @@ export class InventoryService {
     tx: Db,
     input: { productId: string; quantity: number; reason: StockMovementReason; unitCostCents?: number | null; referenceType?: string; referenceId?: string; note?: string; actorId?: string | null },
   ) {
-    const locationId = await this.defaultLocationId();
+    const locationId = await this.defaultLocationId(tx);
     const level = await this.repo.receive(tx, input.productId, locationId, input.quantity);
     await tx.stockMovement.create({
       data: {
