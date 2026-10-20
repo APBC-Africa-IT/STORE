@@ -15,6 +15,7 @@ import { authRoutes } from '../modules/auth/auth.routes';
 import { auditRoutes } from '../modules/audit/audit.routes';
 import { vehicleRoutes } from '../modules/vehicles/vehicles.routes';
 import { catalogRoutes } from '../modules/catalog/catalog.routes';
+import { inventoryRoutes } from '../modules/inventory/inventory.routes';
 
 export async function buildApp() {
   const app = Fastify({
@@ -59,6 +60,7 @@ export async function buildApp() {
   await app.register(auditRoutes, { prefix: '/api/v1' });
   await app.register(vehicleRoutes, { prefix: '/api/v1' });
   await app.register(catalogRoutes, { prefix: '/api/v1' });
+  await app.register(inventoryRoutes, { prefix: '/api/v1' });
 
   // Close connections when the app shuts down (server stop or end of tests)
   app.addHook('onClose', async () => {

@@ -317,10 +317,13 @@ model Product {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  brand       Brand?           @relation(fields: [brandId], references: [id])
-  category    Category         @relation(fields: [categoryId], references: [id])
-  partNumbers PartNumber[]
-  fitments    ProductFitment[]
+  brand          Brand?             @relation(fields: [brandId], references: [id])
+  category       Category           @relation(fields: [categoryId], references: [id])
+  partNumbers    PartNumber[]
+  fitments       ProductFitment[]
+  inventory      InventoryLevel[]
+  stockMovements StockMovement[]
+  reservations   StockReservation[]
 
   @@index([categoryId, status])
   @@index([brandId])
@@ -353,4 +356,107 @@ model ProductFitment {
   @@id([productId, vehicleId])
   @@index([vehicleId])
   @@map("product_fitments")
+}
+
+// ───────────── Inventory ─────────────
+
+model Location {
+  id        String           @id @default(uuid()) @db.Uuid
+  code      String           @unique // e.g. HUB-NBO
+  name      String
+  isDefault Boolean          @default(false) @map("is_default")
+  address   String?
+  createdAt DateTime         @default(now()) @map("created_at")
+  bins      Bin[]
+  levels    InventoryLevel[]
+
+  @@map("locations")
+}
+
+model Bin {
+  id         String           @id @default(uuid()) @db.Uuid
+  locationId String           @map("location_id") @db.Uuid
+  code       String // e.g. A-03-B2
+  createdAt  DateTime         @default(now()) @map("created_at")
+  location   Location         @relation(fields: [locationId], references: [id])
+  levels     InventoryLevel[]
+
+  @@unique([locationId, code])
+  @@map("bins")
+}
+
+/// One row per product per location. available = on_hand - reserved (never stored).
+model InventoryLevel {
+  productId  String   @map("product_id") @db.Uuid
+  locationId String   @map("location_id") @db.Uuid
+  binId      String?  @map("bin_id") @db.Uuid
+  onHand     Int      @default(0) @map("on_hand") // physically in the hub
+  reserved   Int      @default(0) // promised to orders, not yet shipped
+  version    Int      @default(0) // bumped on every change
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+  product    Product  @relation(fields: [productId], references: [id])
+  location   Location @relation(fields: [locationId], references: [id])
+  bin        Bin?     @relation(fields: [binId], references: [id])
+
+  @@id([productId, locationId])
+  @@map("inventory_levels")
+}
+
+enum StockMovementReason {
+  OPENING_BALANCE
+  SALE
+  GRN_RECEIPT
+  CUSTOMER_RETURN
+  DELIVERY_RETURNED
+  RETURN_TO_SUPPLIER
+  ADJUSTMENT_DAMAGED
+  ADJUSTMENT_COUNTED
+  ADJUSTMENT_STOLEN
+  ADJUSTMENT_PROMO_WRITE_OFF
+  ADJUSTMENT_FOUND
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+/// Append-only history of every stock change. Never update or delete rows.
+model StockMovement {
+  id            String              @id @default(uuid()) @db.Uuid
+  productId     String              @map("product_id") @db.Uuid
+  locationId    String              @map("location_id") @db.Uuid
+  quantity      Int // signed: +in, -out
+  reason        StockMovementReason
+  unitCostCents Int?                @map("unit_cost_cents")
+  referenceType String?             @map("reference_type") // ORDER | GRN | STOCKTAKE | RMA | ADJUSTMENT
+  referenceId   String?             @map("reference_id")
+  note          String?
+  actorId       String?             @map("actor_id") @db.Uuid
+  createdAt     DateTime            @default(now()) @map("created_at")
+  product       Product             @relation(fields: [productId], references: [id])
+
+  @@index([productId, createdAt])
+  @@index([referenceType, referenceId])
+  @@map("stock_movements")
+}
+
+enum ReservationStatus {
+  ACTIVE // holding stock
+  COMMITTED // goods left the hub (sold)
+  RELEASED // expired or cancelled
+}
+
+model StockReservation {
+  id          String            @id @default(uuid()) @db.Uuid
+  productId   String            @map("product_id") @db.Uuid
+  locationId  String            @map("location_id") @db.Uuid
+  orderItemId String?           @map("order_item_id") @db.Uuid // linked in the orders step
+  quantity    Int
+  status      ReservationStatus @default(ACTIVE)
+  expiresAt   DateTime?         @map("expires_at") // set while an order awaits payment
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  product     Product           @relation(fields: [productId], references: [id])
+
+  @@index([status, expiresAt])
+  @@index([orderItemId])
+  @@map("stock_reservations")
 }

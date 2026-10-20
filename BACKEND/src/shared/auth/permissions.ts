@@ -9,6 +9,7 @@ export const PERMISSIONS = [
   'catalog:write',
   'pricing:view_cost',
   // inventory
+  'inventory:view',
   'inventory:adjust',
   'inventory:approve_stocktake',
   // orders
@@ -45,7 +46,7 @@ export const ROLES: Record<string, { name: string; permissions: readonly Permiss
     name: 'Operations Manager',
     permissions: [
       'orders:read_all', 'orders:update_status', 'orders:cancel',
-      'inventory:adjust', 'inventory:approve_stocktake',
+      'inventory:view', 'inventory:adjust', 'inventory:approve_stocktake',
       'procurement:create_po', 'procurement:send_po', 'procurement:approve_restock',
       'logistics:assign', 'logistics:manage_riders', 'logistics:reconcile_cod',
       'catalog:write', 'reports:export',
@@ -55,21 +56,24 @@ export const ROLES: Record<string, { name: string; permissions: readonly Permiss
     name: 'Finance Manager',
     permissions: [
       'finance:view', 'finance:approve_below_cost', 'finance:approve_payouts',
-      'pricing:view_cost', 'orders:read_all', 'orders:refund', 'reports:export',
+      'pricing:view_cost', 'orders:read_all', 'orders:refund', 'reports:export', 'inventory:view',
     ],
   },
   STORE_MANAGER: {
     name: 'Store Manager',
     permissions: [
       'pos:sell', 'pos:approve_override', 'pos:manage_shift',
-      'inventory:adjust', 'inventory:approve_stocktake', 'orders:read_all',
+      'inventory:view', 'inventory:adjust', 'inventory:approve_stocktake', 'orders:read_all',
     ],
   },
-  SALES_STAFF: { name: 'Sales Staff', permissions: ['pos:sell', 'pos:manage_shift'] },
-  WAREHOUSE_STAFF: { name: 'Warehouse Staff', permissions: ['orders:read_all', 'orders:update_status'] },
+  SALES_STAFF: { name: 'Sales Staff', permissions: ['pos:sell', 'pos:manage_shift', 'inventory:view'] },
+  WAREHOUSE_STAFF: {
+    name: 'Warehouse Staff',
+    permissions: ['orders:read_all', 'orders:update_status', 'inventory:view', 'inventory:adjust'],
+  },
   PROCUREMENT_OFFICER: {
     name: 'Procurement Officer',
-    permissions: ['procurement:create_po', 'procurement:send_po', 'orders:read_all'],
+    permissions: ['procurement:create_po', 'procurement:send_po', 'orders:read_all', 'inventory:view'],
   },
   DISPATCHER: {
     name: 'Dispatcher',

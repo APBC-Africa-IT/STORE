@@ -31,31 +31,31 @@ const PRODUCTS = [
     sku: 'BRK-PAD-COR-F', name: 'Front Brake Pad Set — Toyota Corolla / Fielder', category: 'brake-pads', brand: 'brembo',
     retail: 4_500_00, cost: 2_600_00, grade: 'PREMIUM' as const, origin: 'AFTERMARKET' as const,
     partNumbers: [{ type: 'OEM' as const, number: '04465-02220' }, { type: 'AFTERMARKET' as const, number: 'P 83 152' }],
-    fits: ['Corolla', 'Fielder'], position: 'Front',
+    fits: ['Corolla', 'Fielder'], position: 'Front', stock: 12, bin: 'B-01-A',
   },
   {
     sku: 'FLT-OIL-1NZ', name: 'Oil Filter — Toyota 1NZ / 2ZR engines', category: 'filters', brand: 'toyota-genuine',
     retail: 850_00, cost: 420_00, grade: 'STANDARD' as const, origin: 'OEM' as const,
     partNumbers: [{ type: 'OEM' as const, number: '90915-YZZE1' }],
-    fits: ['Corolla', 'Probox', 'Fielder'],
+    fits: ['Corolla', 'Probox', 'Fielder'], stock: 2, bin: 'A-02-C', // → Low Stock
   },
   {
     sku: 'SPK-NGK-ILKAR7', name: 'Iridium Spark Plug (each)', category: 'spark-plugs-ignition', brand: 'ngk',
     retail: 1_200_00, cost: 650_00, grade: 'PREMIUM' as const, origin: 'OES' as const,
     partNumbers: [{ type: 'AFTERMARKET' as const, number: 'ILKAR7B11' }, { type: 'OEM' as const, number: '90919-01253' }],
-    fits: ['Corolla', 'Fielder', 'Probox'],
+    fits: ['Corolla', 'Fielder', 'Probox'], stock: 40, bin: 'A-04-B',
   },
   {
     sku: 'SHK-KYB-NOTE-F', name: 'Front Shock Absorber — Nissan Note E12', category: 'shock-absorbers', brand: 'kyb',
     retail: 7_800_00, cost: 4_900_00, grade: 'STANDARD' as const, origin: 'AFTERMARKET' as const,
     partNumbers: [{ type: 'AFTERMARKET' as const, number: '339391' }],
-    fits: ['Note'], position: 'Front',
+    fits: ['Note'], position: 'Front', stock: 0, // → Available to Order (sourced)
   },
   {
     sku: 'FLT-AIR-FOR', name: 'Air Filter — Subaru Forester SJ', category: 'filters', brand: 'sakura',
     retail: 1_650_00, cost: 900_00, grade: 'ECONOMY' as const, origin: 'AFTERMARKET' as const,
     partNumbers: [{ type: 'OEM' as const, number: '16546-AA120' }],
-    fits: ['Forester'],
+    fits: ['Forester'], stock: 0, sourceable: false, // → Rare Part
   },
 ];
 
@@ -110,6 +110,8 @@ export async function seedCatalog(prisma: PrismaClient) {
         categoryId: category.id, brandId: brand.id, qualityGrade: p.grade, origin: p.origin,
         retailPriceCents: p.retail, lastCostCents: p.cost, avgCostCents: p.cost,
         warrantyText: '6 months against manufacturing defects',
+        isSourceable: p.sourceable ?? true,
+        sourcingLeadTimeMins: 120,
       },
     });
     await prisma.partNumber.deleteMany({ where: { productId: product.id } });
@@ -122,6 +124,31 @@ export async function seedCatalog(prisma: PrismaClient) {
         productId: product.id, vehicleId: vehicleIdsByModel.get(model)!, position: p.position ?? null, verified: true,
       })),
     });
+  }
+
+  // Opening stock (only the first time — re-running the seed never doubles stock)
+  const hub = await prisma.location.findUniqueOrThrow({ where: { code: 'HUB-NBO' } });
+  for (const p of PRODUCTS) {
+    const product = await prisma.product.findUniqueOrThrow({ where: { sku: p.sku } });
+    const bin = p.bin
+      ? await prisma.bin.upsert({
+          where: { locationId_code: { locationId: hub.id, code: p.bin } },
+          update: {},
+          create: { locationId: hub.id, code: p.bin },
+        })
+      : null;
+    const existing = await prisma.inventoryLevel.findUnique({
+      where: { productId_locationId: { productId: product.id, locationId: hub.id } },
+    });
+    if (existing) continue;
+    await prisma.inventoryLevel.create({
+      data: { productId: product.id, locationId: hub.id, binId: bin?.id ?? null, onHand: p.stock },
+    });
+    if (p.stock > 0) {
+      await prisma.stockMovement.create({
+        data: { productId: product.id, locationId: hub.id, quantity: p.stock, reason: 'OPENING_BALANCE', unitCostCents: p.cost, note: 'Demo seed' },
+      });
+    }
   }
 
   console.log(`✔ demo catalogue: ${PRODUCTS.length} products, ${VEHICLES.length} vehicles, ${BRANDS.length} brands`);

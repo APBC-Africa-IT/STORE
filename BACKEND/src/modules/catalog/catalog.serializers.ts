@@ -1,6 +1,7 @@
 import { effectiveRetailPrice, isSaleActive } from './pricing.domain';
 import type { ProductDetailRow, ProductRow } from './catalog.repository';
 import { toVehicleDto } from '../vehicles/vehicles.service';
+import type { Availability } from '../inventory/availability.domain';
 
 // IMPORTANT (BR-007 + confidentiality): public DTOs are built from an ALLOW-LIST.
 // Cost, margin and supplier fields are never copied here.
@@ -17,7 +18,7 @@ function publicPrice(p: ProductRow) {
   };
 }
 
-export function toPublicProductCard(p: ProductRow) {
+export function toPublicProductCard(p: ProductRow, availability: Availability | null) {
   return {
     id: p.id,
     sku: p.sku,
@@ -30,13 +31,13 @@ export function toPublicProductCard(p: ProductRow) {
     condition: p.condition,
     price: publicPrice(p),
     partNumbers: p.partNumbers.map((pn) => ({ type: pn.type, number: pn.number })),
-    // availability is added in the inventory step
+    availability,
   };
 }
 
-export function toPublicProductDetail(p: ProductDetailRow, fitsVehicle: boolean | null) {
+export function toPublicProductDetail(p: ProductDetailRow, fitsVehicle: boolean | null, availability: Availability | null) {
   return {
-    ...toPublicProductCard(p),
+    ...toPublicProductCard(p, availability),
     description: p.description,
     specs: p.specs ?? [],
     warrantyText: p.warrantyText,
@@ -47,9 +48,9 @@ export function toPublicProductDetail(p: ProductDetailRow, fitsVehicle: boolean 
 }
 
 /** Staff view. Cost/margin fields only when the user has `pricing:view_cost`. */
-export function toStaffProduct(p: ProductRow | ProductDetailRow, canViewCost: boolean) {
+export function toStaffProduct(p: ProductRow | ProductDetailRow, canViewCost: boolean, availability: Availability | null = null) {
   return {
-    ...toPublicProductCard(p),
+    ...toPublicProductCard(p, availability),
     status: p.status,
     description: p.description,
     barcode: p.barcode,

@@ -46,7 +46,15 @@ async function main() {
     console.log(`✔ admin ${email} created`);
   }
 
-  // 4. Demo catalogue (development only)
+  // 4. Default stock location (the MySpares hub)
+  await prisma.location.upsert({
+    where: { code: 'HUB-NBO' },
+    update: {},
+    create: { code: 'HUB-NBO', name: 'MySpares Hub — Nairobi', isDefault: true },
+  });
+  console.log('✔ default location HUB-NBO');
+
+  // 5. Demo catalogue + stock (development only)
   if (process.env.SEED_DEMO_DATA === 'true') {
     await seedCatalog(prisma);
   }

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../shared/db/prisma';
 import { actorFrom, can } from '../../shared/auth/actor';
+import { inventoryService } from '../inventory/inventory.routes';
 import { CatalogRepository } from './catalog.repository';
 import { CatalogService } from './catalog.service';
 import { toPublicProductCard, toPublicProductDetail, toStaffProduct } from './catalog.serializers';
@@ -28,20 +29,23 @@ export async function catalogRoutes(app: FastifyInstance) {
   app.get('/products', async (req) => {
     const q = ProductListQuery.parse(req.query);
     const { items, page } = await service.listProducts(q, { publicOnly: true });
-    return { data: items.map(toPublicProductCard), page };
+    const availability = await inventoryService.availabilityFor(items);
+    return { data: items.map((p) => toPublicProductCard(p, availability.get(p.id) ?? null)), page };
   });
 
   app.get('/products/:slug', async (req) => {
     const { slug } = SlugParams.parse(req.params);
     const { vehicleId } = ProductDetailQuery.parse(req.query);
     const { product, fits } = await service.getPublicProduct(slug, vehicleId);
-    return { data: toPublicProductDetail(product, fits) };
+    const availability = await inventoryService.availabilityFor([product]);
+    return { data: toPublicProductDetail(product, fits, availability.get(product.id) ?? null) };
   });
 
   app.get('/part-numbers/:number', async (req) => {
     const { number } = z.object({ number: z.string().min(1).max(64) }).parse(req.params);
     const products = await service.productsByPartNumber(number);
-    return { data: products.map(toPublicProductCard) };
+    const availability = await inventoryService.availabilityFor(products);
+    return { data: products.map((p) => toPublicProductCard(p, availability.get(p.id) ?? null)) };
   });
 
   // ═══════════════ Admin ═══════════════
@@ -75,7 +79,8 @@ export async function catalogRoutes(app: FastifyInstance) {
     const q = AdminProductListQuery.parse(req.query);
     const { items, page } = await service.listProducts(q, { publicOnly: false, ...(q.status ? { status: q.status } : {}) });
     const showCost = can(actorFrom(req), 'pricing:view_cost');
-    return { data: items.map((p) => toStaffProduct(p, showCost)), page };
+    const availability = await inventoryService.availabilityFor(items);
+    return { data: items.map((p) => toStaffProduct(p, showCost, availability.get(p.id) ?? null)), page };
   });
 
   app.get('/admin/products/:id', canWrite, async (req) => {
