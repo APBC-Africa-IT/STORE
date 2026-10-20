@@ -32,6 +32,30 @@ const EnvSchema = z.object({
     .refine((v) => Buffer.from(v, 'base64').length === 32, 'FIELD_ENCRYPTION_KEY must be 32 bytes, base64-encoded'),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_LOGIN_MAX: z.coerce.number().int().positive().default(10),
+
+  // Integrations: "fake" = simulated providers (local dev + tests), "live" = real APIs
+  INTEGRATIONS_MODE: z.enum(['fake', 'live']).default('fake'),
+  PUBLIC_API_BASE_URL: z.url().default('http://localhost:4000'), // where Safaricom sends callbacks
+
+  // M-Pesa Daraja
+  MPESA_ENV: z.enum(['sandbox', 'production']).default('sandbox'),
+  MPESA_CONSUMER_KEY: z.string().default(''),
+  MPESA_CONSUMER_SECRET: z.string().default(''),
+  MPESA_SHORTCODE: z.string().default('174379'), // Paybill, or Till "store number"
+  MPESA_PARTY_B: z.string().optional(), // Till number for Buy Goods; defaults to the shortcode
+  MPESA_PASSKEY: z.string().default(''),
+  MPESA_TRANSACTION_TYPE: z.enum(['CustomerPayBillOnline', 'CustomerBuyGoodsOnline']).default('CustomerPayBillOnline'),
+  MPESA_CALLBACK_SECRET: z.string().min(24, 'MPESA_CALLBACK_SECRET must be at least 24 characters'),
+  MPESA_ALLOWED_IPS: z
+    .string()
+    .default('')
+    .transform((v) => v.split(',').map((ip) => ip.trim()).filter(Boolean)),
+}).superRefine((env, ctx) => {
+  if (env.INTEGRATIONS_MODE === 'live') {
+    for (const key of ['MPESA_CONSUMER_KEY', 'MPESA_CONSUMER_SECRET', 'MPESA_PASSKEY'] as const) {
+      if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required when INTEGRATIONS_MODE=live` });
+    }
+  }
 });
 
 const parsed = EnvSchema.safeParse(process.env);

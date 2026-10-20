@@ -605,6 +605,7 @@ model Order {
 
   items         OrderItem[]
   statusHistory OrderStatusEvent[]
+  payments      Payment[]
 
   @@index([status, createdAt])
   @@index([customerId, createdAt])
@@ -648,4 +649,72 @@ model OrderStatusEvent {
 
   @@index([orderId, createdAt])
   @@map("order_status_events")
+}
+
+// ───────────── Payments ─────────────
+
+enum PaymentMethod {
+  MPESA_STK
+  CARD_STRIPE
+  CASH
+  CARD_POS_TERMINAL
+  BANK_TRANSFER
+  COD
+}
+
+enum PaymentKind {
+  FULL
+  DEPOSIT
+  BALANCE
+}
+
+enum PaymentState {
+  INITIATED // row created, provider not called yet
+  PENDING // waiting for the customer / provider callback
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+model Payment {
+  id                String        @id @default(uuid()) @db.Uuid
+  orderId           String        @map("order_id") @db.Uuid
+  method            PaymentMethod
+  kind              PaymentKind
+  state             PaymentState  @default(INITIATED)
+  amountCents       Int           @map("amount_cents")
+  phone             String? // M-Pesa payer (E.164)
+  providerRef       String?       @unique @map("provider_ref") // M-Pesa receipt, e.g. "SJK3XYZ123"
+  providerRequestId String?       @unique @map("provider_request_id") // M-Pesa CheckoutRequestID
+  merchantRequestId String?       @map("merchant_request_id")
+  resultCode        String?       @map("result_code")
+  failureReason     String?       @map("failure_reason")
+  idempotencyKey    String?       @unique @map("idempotency_key")
+  checkAttempts     Int           @default(0) @map("check_attempts")
+  lastCheckedAt     DateTime?     @map("last_checked_at")
+  succeededAt       DateTime?     @map("succeeded_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  order             Order         @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([state, createdAt])
+  @@map("payments")
+}
+
+/// Every callback we receive, stored before processing (dedupe + audit + replay).
+model WebhookEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  provider    String // MPESA | STRIPE
+  externalId  String    @map("external_id") // e.g. CheckoutRequestID
+  payload     Json
+  attempts    Int       @default(0)
+  processedAt DateTime? @map("processed_at")
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([provider, externalId])
+  @@index([processedAt, createdAt])
+  @@map("webhook_events")
 }
