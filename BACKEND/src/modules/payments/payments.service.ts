@@ -265,6 +265,25 @@ export class PaymentsService {
     });
   }
 
+  // ═════════════ Cash on delivery: the rider's cash was counted at the shop (logistics step) ═════════════
+
+  /** Records COD cash as a payment on the order. Call inside the reconciliation transaction. */
+  async recordCodPayment(tx: Tx, orderId: string, amountCents: number, codCollectionId: string) {
+    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+    const payment = await tx.payment.create({
+      data: {
+        orderId, method: 'COD', kind: order.amountPaidCents === 0 ? 'FULL' : 'BALANCE', state: 'SUCCEEDED',
+        amountCents, providerRef: `COD:${codCollectionId}`, succeededAt: new Date(),
+      },
+    });
+    await this.applyToOrder(tx, order, payment);
+    await emitEvent(tx, {
+      type: 'payment.succeeded', aggregateType: 'payment', aggregateId: payment.id,
+      payload: { paymentId: payment.id, orderId, amountCents, method: 'COD' },
+    });
+    return payment;
+  }
+
   // ═════════════ 4. Safety net (runs every minute in the worker) ═════════════
 
   async reconcile(now = new Date()) {

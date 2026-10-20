@@ -87,7 +87,7 @@ export const PoListQuery = z.object({
 // ── Goods received ──
 export const GrnBody = z.object({
   purchaseOrderNumber: z.string().regex(/^PO-\d{4}-\d{5,}$/),
-  collectionFeeCents: cents.default(0), // boda boda trip cost → added to landed cost
+  collectionFeeCents: cents.optional(), // boda boda cost → landed cost. Omit to use the collection job's rider fee
   otherCostsCents: cents.default(0),
   notes: z.string().max(1000).optional(),
   lines: z

@@ -1,0 +1,39 @@
+@baseUrl = http://localhost:4000/api/v1
+@token = paste-admin-access-token
+
+### 1. Who's free? (the seed puts Peter and Brian on duty)
+GET {{baseUrl}}/admin/riders/available
+Authorization: Bearer {{token}}
+
+### 2. Create the delivery job and assign a rider in one go
+POST {{baseUrl}}/admin/logistics/jobs/delivery
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "orderNumber": "ORD-261020-00001", "riderId": "PASTE-RIDER-ID" }
+
+### 3. Rider leaves → order DISPATCHED, stock SOLD, OTP generated for the customer
+POST {{baseUrl}}/admin/logistics/jobs/JOB-261020-00001/start
+Authorization: Bearer {{token}}
+
+### 4. Delivered (photo proof until Step 13 SMSes the OTP to customers)
+POST {{baseUrl}}/admin/logistics/jobs/JOB-261020-00001/delivered
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "type": "PHOTO", "photoUrl": "https://example.com/pod.jpg", "recipientName": "Jane" }
+
+### 5. COD only: count the rider's cash (id from this list)
+GET {{baseUrl}}/admin/logistics/cod?status=OUTSTANDING
+Authorization: Bearer {{token}}
+
+### 6.
+POST {{baseUrl}}/admin/logistics/cod/PASTE-COD-ID/reconcile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "handedOverCents": 260000 }
+
+### 7. What do we owe the rider?
+GET {{baseUrl}}/admin/riders/PASTE-RIDER-ID/earnings
+Authorization: Bearer {{token}}

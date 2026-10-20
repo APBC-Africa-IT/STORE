@@ -5,6 +5,7 @@ import { hashPassword } from '../../src/shared/crypto/password';
 import { seedCatalog } from './catalog';
 import { seedZones } from './zones';
 import { seedSuppliers } from './suppliers';
+import { seedRiders } from './riders';
 
 const prisma = new PrismaClient();
 
@@ -61,6 +62,7 @@ async function main() {
     await seedCatalog(prisma);
     await seedZones(prisma);
     await seedSuppliers(prisma);
+    await seedRiders(prisma);
   }
 }
 

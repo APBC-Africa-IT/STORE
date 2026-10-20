@@ -10,6 +10,7 @@ import { routeAfterConfirm } from '../orders/order.domain';
 import { landedUnitCosts, RECEIVABLE_PO_STATUSES, weightedAverageCost } from './procurement.domain';
 import type { PurchaseOrdersService } from './purchase-orders.service';
 import type { GrnBody } from './procurement.schemas';
+import { transitionJob } from '../logistics/job.transition';
 
 type Tx = Prisma.TransactionClient;
 
@@ -42,9 +43,13 @@ export class GrnService {
     });
     if (lines.every((l) => l.receivedQty === 0)) throw new AppError('VALIDATION_FAILED', 'Nothing was received');
 
+    // Boda boda trips that brought these goods in: their rider fee becomes part of the landed cost.
+    const collectionJobs = await this.db.logisticsJob.findMany({ where: { purchaseOrderId: po.id, type: 'COLLECTION', status: 'AT_HUB' } });
+    const collectionFeeCents = input.collectionFeeCents ?? collectionJobs.reduce((s, j) => s + j.riderFeeCents, 0);
+
     const landed = landedUnitCosts(
       lines.map((l) => ({ unitCostCents: l.item.unitCostCents, acceptedQty: l.acceptedQty })),
-      input.collectionFeeCents + input.otherCostsCents,
+      collectionFeeCents + input.otherCostsCents,
     );
     const totalAccepted = lines.reduce((n, l) => n + l.acceptedQty, 0);
     const totalReceived = lines.reduce((n, l) => n + l.receivedQty, 0);
@@ -92,8 +97,10 @@ export class GrnService {
         const allIn = items.every((it) => it.receivedQty >= (it.confirmedQty ?? it.quantity));
         await tx.purchaseOrder.update({
           where: { id: po.id },
-          data: { collectionFeeCents: { increment: input.collectionFeeCents }, otherCostsCents: { increment: input.otherCostsCents } },
+          data: { collectionFeeCents: { increment: collectionFeeCents }, otherCostsCents: { increment: input.otherCostsCents } },
         });
+        // The collection trips are now costed into stock: close them (AT_HUB → CONFIRMED).
+        for (const job of collectionJobs) await transitionJob(tx, job, 'CONFIRMED', { actorId: actor.userId, note: grn.number });
         if (allIn) {
           const fresh = await tx.purchaseOrder.findUniqueOrThrow({ where: { id: po.id } });
           await this.pos.transition(tx, fresh, 'RECEIVED');

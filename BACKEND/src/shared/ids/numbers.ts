@@ -9,7 +9,9 @@ function eatDate(date = new Date()) {
   return { yymmdd, yymm: yymmdd.slice(0, 4) };
 }
 
-async function nextval(db: Db, sequence: 'order_number_seq' | 'po_number_seq' | 'grn_number_seq' | 'supplier_code_seq') {
+type Sequence = 'order_number_seq' | 'po_number_seq' | 'grn_number_seq' | 'supplier_code_seq' | 'job_number_seq' | 'rider_code_seq';
+
+async function nextval(db: Db, sequence: Sequence) {
   // The sequence name comes from the fixed list above, never from user input.
   const [row] = await db.$queryRawUnsafe<Array<{ n: bigint }>>(`SELECT nextval('${sequence}') AS n`);
   return String(row!.n);
@@ -33,4 +35,14 @@ export async function nextGrnNumber(db: Db) {
 /** SUP-0012 */
 export async function nextSupplierCode(db: Db) {
   return `SUP-${(await nextval(db, 'supplier_code_seq')).padStart(4, '0')}`;
+}
+
+/** JOB-261020-00007 */
+export async function nextJobNumber(db: Db) {
+  return `JOB-${eatDate().yymmdd}-${(await nextval(db, 'job_number_seq')).padStart(5, '0')}`;
+}
+
+/** RDR-0003 */
+export async function nextRiderCode(db: Db) {
+  return `RDR-${(await nextval(db, 'rider_code_seq')).padStart(4, '0')}`;
 }

@@ -317,8 +317,8 @@ model Product {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  brand          Brand?             @relation(fields: [brandId], references: [id])
-  category       Category           @relation(fields: [categoryId], references: [id])
+  brand          Brand?                @relation(fields: [brandId], references: [id])
+  category       Category              @relation(fields: [categoryId], references: [id])
   partNumbers    PartNumber[]
   fitments       ProductFitment[]
   inventory      InventoryLevel[]
@@ -565,52 +565,53 @@ enum ItemSourcingStatus {
 }
 
 model Order {
-  id                   String         @id @default(uuid()) @db.Uuid
-  number               String         @unique // ORD-261020-00042
-  channel              OrderChannel
-  status               OrderStatus    @default(PENDING_PAYMENT)
-  paymentStatus        PaymentStatus  @default(UNPAID) @map("payment_status")
-  paymentPlan          PaymentPlan    @map("payment_plan")
-  customerId           String?        @map("customer_id") @db.Uuid
-  contactName          String         @map("contact_name")
-  contactPhone         String         @map("contact_phone")
-  contactEmail         String?        @map("contact_email")
-  deliveryMethod       DeliveryMethod @map("delivery_method")
-  deliveryAddress      Json?          @map("delivery_address") // snapshot at order time
-  deliveryZoneId       String?        @map("delivery_zone_id") @db.Uuid
-  hasSourcedItems      Boolean        @default(false) @map("has_sourced_items")
-  sourcingAcceptedAt   DateTime?      @map("sourcing_accepted_at")
-  promisedBy           DateTime?      @map("promised_by")
+  id                 String         @id @default(uuid()) @db.Uuid
+  number             String         @unique // ORD-261020-00042
+  channel            OrderChannel
+  status             OrderStatus    @default(PENDING_PAYMENT)
+  paymentStatus      PaymentStatus  @default(UNPAID) @map("payment_status")
+  paymentPlan        PaymentPlan    @map("payment_plan")
+  customerId         String?        @map("customer_id") @db.Uuid
+  contactName        String         @map("contact_name")
+  contactPhone       String         @map("contact_phone")
+  contactEmail       String?        @map("contact_email")
+  deliveryMethod     DeliveryMethod @map("delivery_method")
+  deliveryAddress    Json?          @map("delivery_address") // snapshot at order time
+  deliveryZoneId     String?        @map("delivery_zone_id") @db.Uuid
+  hasSourcedItems    Boolean        @default(false) @map("has_sourced_items")
+  sourcingAcceptedAt DateTime?      @map("sourcing_accepted_at")
+  promisedBy         DateTime?      @map("promised_by")
 
   // Money (cents, VAT-inclusive)
-  subtotalCents        Int            @map("subtotal_cents")
-  discountCents        Int            @default(0) @map("discount_cents")
-  deliveryFeeCents     Int            @default(0) @map("delivery_fee_cents")
-  vatCents             Int            @map("vat_cents")
-  totalCents           Int            @map("total_cents")
-  depositRequiredCents Int            @default(0) @map("deposit_required_cents")
-  amountPaidCents      Int            @default(0) @map("amount_paid_cents")
-  amountRefundedCents  Int            @default(0) @map("amount_refunded_cents")
+  subtotalCents        Int @map("subtotal_cents")
+  discountCents        Int @default(0) @map("discount_cents")
+  deliveryFeeCents     Int @default(0) @map("delivery_fee_cents")
+  vatCents             Int @map("vat_cents")
+  totalCents           Int @map("total_cents")
+  depositRequiredCents Int @default(0) @map("deposit_required_cents")
+  amountPaidCents      Int @default(0) @map("amount_paid_cents")
+  amountRefundedCents  Int @default(0) @map("amount_refunded_cents")
 
-  paymentDueBy         DateTime?      @map("payment_due_by") // unpaid orders auto-cancel after this
-  idempotencyKey       String?        @unique @map("idempotency_key")
-  requestHash          String?        @map("request_hash")
-  createdById          String?        @map("created_by_id") @db.Uuid // staff (POS)
-  cancelledReason      String?        @map("cancelled_reason")
-  version              Int            @default(0)
-  placedAt             DateTime?      @map("placed_at")
-  packedAt             DateTime?      @map("packed_at")
-  packedById           String?        @map("packed_by_id") @db.Uuid
-  completedAt          DateTime?      @map("completed_at")
-  cancelledAt          DateTime?      @map("cancelled_at")
-  deliveredAt          DateTime?      @map("delivered_at")
-  createdAt            DateTime       @default(now()) @map("created_at")
-  updatedAt            DateTime       @updatedAt @map("updated_at")
+  paymentDueBy    DateTime? @map("payment_due_by") // unpaid orders auto-cancel after this
+  idempotencyKey  String?   @unique @map("idempotency_key")
+  requestHash     String?   @map("request_hash")
+  createdById     String?   @map("created_by_id") @db.Uuid // staff (POS)
+  cancelledReason String?   @map("cancelled_reason")
+  version         Int       @default(0)
+  placedAt        DateTime? @map("placed_at")
+  packedAt        DateTime? @map("packed_at")
+  packedById      String?   @map("packed_by_id") @db.Uuid
+  completedAt     DateTime? @map("completed_at")
+  cancelledAt     DateTime? @map("cancelled_at")
+  deliveredAt     DateTime? @map("delivered_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   items         OrderItem[]
   statusHistory OrderStatusEvent[]
   payments      Payment[]
   notes         OrderNote[]
+  logisticsJobs LogisticsJob[]
 
   @@index([status, createdAt])
   @@index([customerId, createdAt])
@@ -759,24 +760,24 @@ enum PaymentTerms {
 }
 
 model Supplier {
-  id                  String         @id @default(uuid()) @db.Uuid
-  code                String         @unique // SUP-0001
+  id                  String                @id @default(uuid()) @db.Uuid
+  code                String                @unique // SUP-0001
   name                String
   type                SupplierType
-  status              SupplierStatus @default(ACTIVE)
-  statusReason        String?        @map("status_reason")
-  contactName         String?        @map("contact_name")
+  status              SupplierStatus        @default(ACTIVE)
+  statusReason        String?               @map("status_reason")
+  contactName         String?               @map("contact_name")
   phone               String
   email               String?
   whatsapp            String?
-  addressLine         String         @map("address_line")
+  addressLine         String                @map("address_line")
   area                String
   categories          String[] // category slugs they specialise in
-  paymentTerms        PaymentTerms   @default(ON_COLLECTION) @map("payment_terms")
-  typicalLeadTimeMins Int            @default(120) @map("typical_lead_time_mins")
+  paymentTerms        PaymentTerms          @default(ON_COLLECTION) @map("payment_terms")
+  typicalLeadTimeMins Int                   @default(120) @map("typical_lead_time_mins")
   notes               String?
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
   catalog             SupplierCatalogItem[]
   purchaseOrders      PurchaseOrder[]
 
@@ -838,29 +839,31 @@ enum PoChannel {
 }
 
 model PurchaseOrder {
-  id                 String              @id @default(uuid()) @db.Uuid
-  number             String              @unique // PO-2610-00001
-  supplierId         String              @map("supplier_id") @db.Uuid
-  kind               PurchaseOrderKind
-  status             PurchaseOrderStatus @default(DRAFT)
-  sentVia            PoChannel?          @map("sent_via")
-  sentAt             DateTime?           @map("sent_at")
-  confirmedAt        DateTime?           @map("confirmed_at")
-  supplierReadyAt    DateTime?           @map("supplier_ready_at")
-  rejectionReason    String?             @map("rejection_reason")
-  collectionCodeHash String?             @map("collection_code_hash")
-  totalCostCents     Int                 @default(0) @map("total_cost_cents")
-  collectionFeeCents Int                 @default(0) @map("collection_fee_cents") // boda boda trip → landed cost
-  otherCostsCents    Int                 @default(0) @map("other_costs_cents")
-  createdById        String              @map("created_by_id") @db.Uuid
-  approvedById       String?             @map("approved_by_id") @db.Uuid
-  notes              String?
-  version            Int                 @default(0)
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
-  supplier           Supplier            @relation(fields: [supplierId], references: [id])
-  items              PurchaseOrderItem[]
-  grns               Grn[]
+  id                     String              @id @default(uuid()) @db.Uuid
+  number                 String              @unique // PO-2610-00001
+  supplierId             String              @map("supplier_id") @db.Uuid
+  kind                   PurchaseOrderKind
+  status                 PurchaseOrderStatus @default(DRAFT)
+  sentVia                PoChannel?          @map("sent_via")
+  sentAt                 DateTime?           @map("sent_at")
+  confirmedAt            DateTime?           @map("confirmed_at")
+  supplierReadyAt        DateTime?           @map("supplier_ready_at")
+  rejectionReason        String?             @map("rejection_reason")
+  collectionCodeHash     String?             @map("collection_code_hash")
+  collectionCodeAttempts Int                 @default(0) @map("collection_code_attempts")
+  totalCostCents         Int                 @default(0) @map("total_cost_cents")
+  collectionFeeCents     Int                 @default(0) @map("collection_fee_cents") // boda boda trip → landed cost
+  otherCostsCents        Int                 @default(0) @map("other_costs_cents")
+  createdById            String              @map("created_by_id") @db.Uuid
+  approvedById           String?             @map("approved_by_id") @db.Uuid
+  notes                  String?
+  version                Int                 @default(0)
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
+  supplier               Supplier            @relation(fields: [supplierId], references: [id])
+  items                  PurchaseOrderItem[]
+  grns                   Grn[]
+  logisticsJobs          LogisticsJob[]
 
   @@index([status, createdAt])
   @@index([supplierId, status])
@@ -921,4 +924,163 @@ model GrnLine {
   purchaseOrderItem   PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id])
 
   @@map("grn_lines")
+}
+
+// ───────────── Logistics: boda boda riders, jobs, COD, earnings ─────────────
+
+enum RiderStatus {
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+model Rider {
+  id              String          @id @default(uuid()) @db.Uuid
+  code            String          @unique // RDR-0001
+  name            String
+  phone           String          @unique
+  nationalIdEnc   String          @map("national_id_enc") // AES-256-GCM — never returned by the API
+  nationalIdLast4 String          @map("national_id_last4") // for staff to recognise the rider
+  bikePlate       String          @map("bike_plate")
+  mpesaNumber     String          @map("mpesa_number") // where earnings are paid
+  status          RiderStatus     @default(ACTIVE)
+  statusReason    String?         @map("status_reason")
+  isPreferred     Boolean         @default(false) @map("is_preferred")
+  isOnDuty        Boolean         @default(false) @map("is_on_duty")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  jobs            LogisticsJob[]
+  earnings        RiderEarning[]
+  codCollections  CodCollection[]
+
+  @@map("riders")
+}
+
+enum JobType {
+  COLLECTION // supplier → hub
+  DELIVERY // hub → customer
+}
+
+enum JobStatus {
+  CREATED
+  ASSIGNED
+  EN_ROUTE // heading to the supplier (collection) or the customer (delivery)
+  COLLECTED // collection: part picked up from the supplier
+  AT_HUB // collection: part dropped at the hub
+  CONFIRMED // collection: goods received (GRN) — fee added to landed cost
+  DELIVERED // delivery: customer has the parcel (proof recorded)
+  FAILED // trip didn't succeed
+  RETURNED // delivery: failed parcel is back at the hub
+  CANCELLED
+}
+
+enum JobUrgency {
+  NORMAL
+  URGENT
+}
+
+/// BR-005: every boda boda trip is a job, created BEFORE the rider leaves. No job, no trip, no pay.
+model LogisticsJob {
+  id              String              @id @default(uuid()) @db.Uuid
+  number          String              @unique // JOB-261020-00007
+  type            JobType
+  status          JobStatus           @default(CREATED)
+  urgency         JobUrgency          @default(NORMAL)
+  riderId         String?             @map("rider_id") @db.Uuid
+  purchaseOrderId String?             @map("purchase_order_id") @db.Uuid // COLLECTION
+  orderId         String?             @map("order_id") @db.Uuid // DELIVERY
+  origin          Json // { name, phone, address }
+  destination     Json
+  instructions    String?
+  codAmountCents  Int                 @default(0) @map("cod_amount_cents") // cash the rider must collect
+  deliveryOtpHash String?             @map("delivery_otp_hash")
+  otpAttempts     Int                 @default(0) @map("otp_attempts")
+  proof           Json? // { type: "OTP" } | { type: "PHOTO", photoUrl, recipientName }
+  riderFeeCents   Int                 @map("rider_fee_cents") // what we pay the rider for this trip
+  failReason      String?             @map("fail_reason")
+  cancelReason    String?             @map("cancel_reason")
+  assignedAt      DateTime?           @map("assigned_at")
+  startedAt       DateTime?           @map("started_at")
+  completedAt     DateTime?           @map("completed_at")
+  createdById     String              @map("created_by_id") @db.Uuid
+  version         Int                 @default(0)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  rider           Rider?              @relation(fields: [riderId], references: [id])
+  purchaseOrder   PurchaseOrder?      @relation(fields: [purchaseOrderId], references: [id])
+  order           Order?              @relation(fields: [orderId], references: [id])
+  events          LogisticsJobEvent[]
+  codCollection   CodCollection?
+  earning         RiderEarning?
+
+  @@index([status, type])
+  @@index([riderId, status])
+  @@index([purchaseOrderId])
+  @@index([orderId])
+  @@map("logistics_jobs")
+}
+
+model LogisticsJobEvent {
+  id         String       @id @default(uuid()) @db.Uuid
+  jobId      String       @map("job_id") @db.Uuid
+  fromStatus JobStatus?   @map("from_status")
+  toStatus   JobStatus    @map("to_status")
+  actorId    String?      @map("actor_id") @db.Uuid
+  note       String?
+  createdAt  DateTime     @default(now()) @map("created_at")
+  job        LogisticsJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, createdAt])
+  @@map("logistics_job_events")
+}
+
+enum CodStatus {
+  OUTSTANDING // rider has the cash
+  RECONCILED // counted at the shop, matches
+  DISCREPANCY // counted, short — finance follows up
+}
+
+/// Cash a rider collected on delivery. BR-006: must be handed in within 24 hours.
+model CodCollection {
+  id              String       @id @default(uuid()) @db.Uuid
+  jobId           String       @unique @map("job_id") @db.Uuid
+  orderId         String       @map("order_id") @db.Uuid
+  riderId         String       @map("rider_id") @db.Uuid
+  expectedCents   Int          @map("expected_cents")
+  handedOverCents Int?         @map("handed_over_cents")
+  status          CodStatus    @default(OUTSTANDING)
+  collectedAt     DateTime     @map("collected_at")
+  reconciledAt    DateTime?    @map("reconciled_at")
+  reconciledById  String?      @map("reconciled_by_id") @db.Uuid
+  alertedAt       DateTime?    @map("alerted_at") // overdue alert sent
+  note            String?
+  job             LogisticsJob @relation(fields: [jobId], references: [id])
+  rider           Rider        @relation(fields: [riderId], references: [id])
+
+  @@index([status, collectedAt])
+  @@index([riderId, status])
+  @@map("cod_collections")
+}
+
+enum EarningType {
+  TRIP
+  BONUS
+  DEDUCTION
+}
+
+/// What we owe each rider. One TRIP row per job (unique jobId) — never paid twice.
+model RiderEarning {
+  id          String        @id @default(uuid()) @db.Uuid
+  riderId     String        @map("rider_id") @db.Uuid
+  jobId       String?       @unique @map("job_id") @db.Uuid
+  type        EarningType
+  amountCents Int           @map("amount_cents") // negative for deductions
+  reason      String?
+  createdById String?       @map("created_by_id") @db.Uuid
+  createdAt   DateTime      @default(now()) @map("created_at")
+  rider       Rider         @relation(fields: [riderId], references: [id])
+  job         LogisticsJob? @relation(fields: [jobId], references: [id])
+
+  @@index([riderId, createdAt])
+  @@map("rider_earnings")
 }
